@@ -233,12 +233,26 @@ export const docAnchors = {
   },
 
   // Trim rules, in the World tab's Tools
+  'world.trim': {
+    label: 'Trim unused chunks',
+    route: '/servers/:name/world#tools',
+    kind: 'card',
+    icon: 'i-lucide-scissors',
+  },
   'world.trim-rules': {
     label: 'What trimming keeps',
     route: '/servers/:name/world#tools',
     kind: 'section',
     icon: 'i-lucide-scissors',
     need: 'world.manage',
+  },
+  'trim.open': {
+    label: 'Preview and trim',
+    route: '/servers/:name/world#tools',
+    kind: 'button',
+    icon: 'i-lucide-scissors',
+    need: 'world.manage',
+    action: true,
   },
 
   // Public page and Discord chat, in a server's Settings, Community
