@@ -213,6 +213,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "flytower-anvil"
+version = "0.0.0"
+dependencies = [
+ "flate2",
+ "lz4_flex",
+]
+
+[[package]]
 name = "flytower-du"
 version = "0.0.0"
 
@@ -221,7 +229,7 @@ name = "flytower-map"
 version = "0.0.0"
 dependencies = [
  "flate2",
- "lz4_flex",
+ "flytower-anvil",
  "png",
  "serde_json",
 ]
