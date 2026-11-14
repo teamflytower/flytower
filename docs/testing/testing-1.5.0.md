@@ -15,7 +15,7 @@ On a box that already runs Flytower, switch it to the Beta channel under **Syste
 ## 1. Updating from 1.4.3
 
 - [ ] The update finishes and the panel comes back without a manual restart.
-- [ ] `systemctl status flytower-agent` is active, and `/opt/flytower/current/bin/flytower-agent --version` prints 1.5.0-beta.1.
+- [ ] **System** shows 1.5.0-beta.1, and `journalctl -u flytower-agent -n 20` ends with `flytower-agent 1.5.0-beta.1 (rust) listening`.
 - [ ] A box that had `bun` in `/etc/flytower/agent` still updates and runs the Rust agent.
 - [ ] A box that was on the Native channel shows a notice and is now on Stable or Beta.
 - [ ] Servers that were running before the update are still running.
@@ -23,7 +23,7 @@ On a box that already runs Flytower, switch it to the Beta channel under **Syste
 ## 2. Systemd over D-Bus (not yet tried on a real box)
 
 - [ ] Start, stop and restart a server from the panel: each takes effect within a second or two, and the status badge follows.
-- [ ] Stop a server from the shell with `systemctl stop flytower-server@<name>`: the panel shows it stopped without a reload.
+- [ ] Stop a server from the shell with `systemctl stop flytower-mc@<name>`: the panel shows it stopped without a reload.
 - [ ] Kill the Java process (`kill -9`): the crash banner appears and the server restarts as before.
 - [ ] `journalctl -u flytower-agent -n 50` shows no D-Bus errors.
 
