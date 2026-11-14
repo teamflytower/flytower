@@ -70,7 +70,7 @@ Flytower is built to be safe to leave on the internet:
 - Each Minecraft server runs as its own user, in its own folder, with its own memory limit.
 - Updates are signed, checked before they're installed, and undone if they fail.
 
-If you find a security problem, please email [hello@flytower.dev](mailto:hello@flytower.dev) rather than opening a public issue.
+If you find a security problem, please report it privately rather than in a public issue: email [security@flytower.dev](mailto:security@flytower.dev) or use [GitHub's private reporting](https://github.com/teamflytower/flytower/security/advisories/new). The [security policy](https://github.com/teamflytower/flytower/blob/main/SECURITY.md) has the details.
 
 ## Can friends help run the servers?
 
