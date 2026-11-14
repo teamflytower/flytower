@@ -3,11 +3,13 @@ package main
 import (
 	"bytes"
 	"context"
+	"log/slog"
 	"net"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/teamflytower/flytower/go/router"
 	"github.com/teamflytower/flytower/go/router/control"
@@ -89,5 +91,48 @@ func TestCtl(t *testing.T) {
 	}
 	if !strings.Contains(errs.String(), "invalid_params") {
 		t.Errorf("bad table: %s", errs.String())
+	}
+}
+
+func TestListenWaitsForThePort(t *testing.T) {
+	held, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	addr := held.Addr().String()
+	got := make(chan error, 1)
+	go func() {
+		ln, err := listenWhenFree(context.Background(), addr, 20*time.Millisecond, slog.New(slog.DiscardHandler))
+		if ln != nil {
+			_ = ln.Close()
+		}
+		got <- err
+	}()
+	select {
+	case err := <-got:
+		t.Fatalf("listened while the port was taken: %v", err)
+	case <-time.After(100 * time.Millisecond):
+	}
+	_ = held.Close()
+	select {
+	case err := <-got:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("never listened once the port was free")
+	}
+}
+
+func TestListenGivesUpWhenStopped(t *testing.T) {
+	held, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer held.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	if _, err := listenWhenFree(ctx, held.Addr().String(), 10*time.Millisecond, slog.New(slog.DiscardHandler)); err == nil {
+		t.Fatal("expected an error once stopped")
 	}
 }

@@ -165,11 +165,6 @@ func serve(args []string, stderr io.Writer) int {
 		ctl.AllowUIDs = append(ctl.AllowUIDs, uint32(uid))
 	}
 
-	ln, err := net.Listen("tcp", *listen)
-	if err != nil {
-		log.Error("can't listen", "address", *listen, "err", err)
-		return 1
-	}
 	_ = os.Remove(*controlPath)
 	cln, err := net.ListenUnix("unix", &net.UnixAddr{Name: *controlPath, Net: "unix"})
 	if err != nil {
@@ -191,6 +186,16 @@ func serve(args []string, stderr io.Writer) int {
 			stop()
 		}
 	}()
+	// The control socket is up first, so the panel can send routes while we wait for the port.
+	ln, err := listenWhenFree(ctx, *listen, 2*time.Second, log)
+	if err != nil {
+		if ctx.Err() != nil {
+			log.Info("stopped")
+			return 0
+		}
+		log.Error("can't listen", "address", *listen, "err", err)
+		return 1
+	}
 	log.Info("routing players", "version", version, "listen", ln.Addr().String(),
 		"routes", len(r.Table().Routes), "control", *controlPath)
 	if err := r.Serve(ctx, ln); err != nil {
@@ -199,6 +204,29 @@ func serve(args []string, stderr io.Writer) int {
 	}
 	log.Info("stopped")
 	return 0
+}
+
+// listenWhenFree listens on addr, waiting while something else holds the port. When routing
+// is turned on, a server that was on the router's port keeps it until its next restart, and
+// exiting instead would have systemd give up on the router after a few quick restarts.
+func listenWhenFree(ctx context.Context, addr string, every time.Duration, log *slog.Logger) (net.Listener, error) {
+	var lc net.ListenConfig
+	warned := time.Time{}
+	for {
+		ln, err := lc.Listen(ctx, "tcp", addr)
+		if err == nil || !errors.Is(err, syscall.EADDRINUSE) {
+			return ln, err
+		}
+		if time.Since(warned) >= time.Minute {
+			log.Warn("the port is in use, probably by a server that moves off it at its next restart; waiting for it", "address", addr)
+			warned = time.Now()
+		}
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(every):
+		}
+	}
 }
 
 // reloadOnHangup re-reads the kept routes on SIGHUP (systemctl reload), for editing them by
