@@ -9,6 +9,7 @@ import { writeLock } from '../server/spec/lock'
 import { parseProperties, setProperties, stringifyProperties, toRecord } from '../server/properties'
 import { parseProgress, startCommands } from '../server/world/chunky'
 import { WorldService } from '../server/world/service'
+import type { NotifyEvent } from '../server/notify/types'
 
 describe('chunky', () => {
   it('reads progress lines', () => {
@@ -54,6 +55,13 @@ async function setup(
     chunky?: boolean
     running?: boolean
     keepFails?: string
+    noSpace?: boolean
+    snapshotFails?: boolean
+    wontStop?: boolean
+    tool?: (
+      args: string[],
+      onProgress?: (p: { done: number; total: number }) => void,
+    ) => Promise<string>
   } = {},
 ) {
   const db = openDb(':memory:')
@@ -106,7 +114,7 @@ async function setup(
   const agent = (async (verb: Verb) => {
     calls.push(verb)
     if (verb === 'service.status') return { active: state, since: null }
-    if (verb === 'service.stop') state = 'inactive'
+    if (verb === 'service.stop' && !opts.wontStop) state = 'inactive'
     if (verb === 'service.start') state = 'active'
     return {}
   }) as AgentCall
@@ -119,6 +127,7 @@ async function setup(
     'chunky confirm': 'Done.',
   }
   const snapshots: string[] = []
+  const notified: NotifyEvent[] = []
   const keptBackups: boolean[] = []
   const pastWorlds: { name: string; files: string[] }[] = []
   const locked = new Set<string>()
@@ -142,12 +151,15 @@ async function setup(
         return () => void locked.delete(n)
       },
       snapshot: async (_n, note, o) => {
+        if (opts.snapshotFails) throw new Error("The backup couldn't be written")
         snapshots.push(note)
         keptBackups.push(!!o?.kept)
         return {} as never
       },
       withSavesPaused: async (_s, _r, fn) => fn(),
-      ensureSpace: async () => {},
+      ensureSpace: async () => {
+        if (opts.noSpace) throw new Error('Not enough disk space: this needs up to 80 MB')
+      },
     },
     exports: {
       keepWorld: async (_n, path, name) => {
@@ -171,6 +183,8 @@ async function setup(
         ),
       ),
     sleep: async () => {},
+    worldTool: opts.tool,
+    notify: (e) => notified.push(e),
   })
   // A second server whose world can be copied in.
   const other = join(servers, 'creative')
@@ -193,7 +207,18 @@ async function setup(
       eulaAcceptedAt: new Date(),
     })
     .run()
-  return { world, dir, calls, sent, snapshots, keptBackups, pastWorlds, replies, propsPath }
+  return {
+    world,
+    dir,
+    calls,
+    sent,
+    snapshots,
+    keptBackups,
+    pastWorlds,
+    replies,
+    propsPath,
+    notified,
+  }
 }
 
 describe('pre-generation', () => {
@@ -346,5 +371,157 @@ describe('copying a world in', () => {
   it('refuses copying a server into itself', async () => {
     const { world } = await setup()
     expect(() => world.copyWorld('survival', 'survival')).toThrow("can't copy its own world")
+  })
+})
+
+/** What flytower-world says after trimming (or, with --dry-run, would). */
+function toolAnswer(dryRun: boolean, removed = 300) {
+  return `${JSON.stringify({
+    version: 1,
+    dryRun,
+    pregenerated: false,
+    warnings: [],
+    dimensions: [
+      {
+        id: 'minecraft:overworld',
+        regions: 4,
+        chunks: 1000,
+        removed,
+        regionsDeleted: 1,
+        bytesBefore: 40 * 1024 ** 2,
+        bytesAfter: 30 * 1024 ** 2,
+        full: 900,
+        unvisited: 200,
+        errors: 0,
+        firstError: null,
+      },
+    ],
+    ms: 120,
+  })}\n`
+}
+
+/** A stand-in for flytower-world that records how it was run, and what was running then. */
+function fakeTool(state: { runs: string[][]; rules: unknown[] }, fail?: string) {
+  return async (args: string[], onProgress?: (p: { done: number; total: number }) => void) => {
+    state.runs.push(args)
+    state.rules.push(JSON.parse(readFileSync(args[args.indexOf('--rules') + 1]!, 'utf8')))
+    onProgress?.({ done: 0, total: 2 })
+    onProgress?.({ done: 2, total: 2 })
+    if (fail) throw new Error(fail)
+    return toolAnswer(args.includes('--dry-run'))
+  }
+}
+
+describe('trimming unused chunks', () => {
+  const rules = { inhabitedMinutes: 5, spawnRadius: 8 }
+
+  it('previews with a dry run while the server keeps running', async () => {
+    const t = { runs: [] as string[][], rules: [] as unknown[] }
+    const { world, dir, calls, snapshots } = await setup({ tool: fakeTool(t) })
+    const preview = await world.trimPreview('survival', rules)
+    expect(preview).toMatchObject({ dryRun: true, running: true })
+    expect(preview.dimensions[0]).toMatchObject({ removed: 300, bytesAfter: 30 * 1024 ** 2 })
+    expect(t.runs[0]).toContain('--dry-run')
+    expect(t.runs[0]![t.runs[0]!.indexOf('--world') + 1]).toBe(join(dir, 'world'))
+    expect(t.rules).toEqual([rules])
+    expect(calls).not.toContain('service.stop')
+    expect(snapshots).toEqual([])
+  })
+
+  it("won't preview a world that hasn't been made yet", async () => {
+    const t = { runs: [] as string[][], rules: [] as unknown[] }
+    const { world, dir } = await setup({ tool: fakeTool(t) })
+    rmSync(join(dir, 'world', 'level.dat'))
+    await expect(world.trimPreview('survival', rules)).rejects.toThrow('no world to trim')
+    expect(t.runs).toEqual([])
+  })
+
+  it('backs up, stops the server, trims, then starts it again', async () => {
+    const t = { runs: [] as string[][], rules: [] as unknown[] }
+    const { world, calls, snapshots, keptBackups, notified } = await setup({ tool: fakeTool(t) })
+    const job = await world.trim('survival', rules, { keepBackup: true }).done
+    expect(job).toMatchObject({ state: 'succeeded' })
+    expect(job.message).toBe(
+      'Removed 300 chunks and freed 10.0 MB. The region files are now 30.0 MB.',
+    )
+    expect(snapshots).toEqual(['Before trimming unused chunks'])
+    expect(keptBackups).toEqual([true])
+    expect(t.runs[0]).not.toContain('--dry-run')
+    expect(t.rules).toEqual([rules])
+    // Stopped before the tool ran, and permissions fixed both sides of it.
+    const stop = calls.indexOf('service.stop')
+    const start = calls.lastIndexOf('service.start')
+    expect(stop).toBeGreaterThan(-1)
+    expect(calls.filter((c) => c === 'server.permissions')).toHaveLength(2)
+    expect(start).toBeGreaterThan(calls.lastIndexOf('server.permissions'))
+    expect(notified).toMatchObject([
+      { kind: 'world.trimmed', server: 'survival', severity: 'info' },
+    ])
+  })
+
+  it('leaves a stopped server stopped', async () => {
+    const t = { runs: [] as string[][], rules: [] as unknown[] }
+    const { world, calls } = await setup({ tool: fakeTool(t), running: false })
+    expect((await world.trim('survival', rules).done).state).toBe('succeeded')
+    expect(calls).not.toContain('service.stop')
+    expect(calls).not.toContain('service.start')
+  })
+
+  it('stops before the backup when there is no room, and changes nothing', async () => {
+    const t = { runs: [] as string[][], rules: [] as unknown[] }
+    const { world, calls, snapshots } = await setup({ tool: fakeTool(t), noSpace: true })
+    const job = await world.trim('survival', rules).done
+    expect(job).toMatchObject({ state: 'failed' })
+    expect(job.message).toContain('Not enough disk space')
+    expect(snapshots).toEqual([])
+    expect(t.runs).toEqual([])
+    expect(calls).not.toContain('service.stop')
+  })
+
+  it("doesn't trim when the backup fails", async () => {
+    const t = { runs: [] as string[][], rules: [] as unknown[] }
+    const { world, calls, notified } = await setup({ tool: fakeTool(t), snapshotFails: true })
+    const job = await world.trim('survival', rules).done
+    expect(job).toMatchObject({ state: 'failed' })
+    expect(job.message).toContain("The backup couldn't be written")
+    expect(t.runs).toEqual([])
+    expect(calls).not.toContain('service.stop')
+    expect(notified).toEqual([])
+  })
+
+  it("doesn't trim a server that won't stop", async () => {
+    const t = { runs: [] as string[][], rules: [] as unknown[] }
+    const { world } = await setup({ tool: fakeTool(t), wontStop: true })
+    const job = await world.trim('survival', rules).done
+    expect(job).toMatchObject({ state: 'failed' })
+    expect(job.message).toContain('took too long to stop')
+    expect(t.runs).toEqual([])
+  })
+
+  it('starts the server again when the tool fails, and says the backup has the world', async () => {
+    const t = { runs: [] as string[][], rules: [] as unknown[] }
+    const { world, calls } = await setup({ tool: fakeTool(t, 'r.0.0.mca: disk full') })
+    const job = await world.trim('survival', rules).done
+    expect(job).toMatchObject({ state: 'failed' })
+    expect(job.message).toContain('r.0.0.mca: disk full')
+    expect(job.message).toContain('the backup taken first')
+    expect(calls.at(-1)).toBe('service.start')
+  })
+
+  it('runs one trim or preview at a time per server', async () => {
+    let finish!: () => void
+    const held = new Promise<void>((r) => (finish = r))
+    const { world } = await setup({
+      tool: async (args) => {
+        await held
+        return toolAnswer(args.includes('--dry-run'))
+      },
+    })
+    const first = world.trimPreview('survival', rules)
+    await Bun.sleep(5)
+    expect(() => world.trim('survival', rules)).toThrow('already being looked at or trimmed')
+    finish()
+    await first
+    expect((await world.trim('survival', rules).done).state).toBe('succeeded')
   })
 })

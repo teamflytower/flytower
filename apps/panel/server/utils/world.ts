@@ -1,9 +1,28 @@
+import { dirname, join } from 'node:path'
 import type { H3Event } from 'h3'
 import { z } from 'zod'
 import { JobError } from '../jobs/runner'
+import { runRenderer } from '../map/service'
 import { WorldService } from '../world/service'
+import type { ToolProgress } from '../world/trim'
 
 let service: WorldService | undefined
+
+/** Where the world tool is: next to Bun in the release's bin/, or wherever FLYTOWER_WORLD says. */
+export const worldBinary = () =>
+  process.env.FLYTOWER_WORLD || join(dirname(process.execPath), 'flytower-world')
+
+/**
+ * Runs flytower-world at low CPU and disk priority, so the Minecraft servers come first. It
+ * runs as the panel, after `server.permissions`, like the web map.
+ */
+function runWorldTool(args: string[], onProgress?: (p: ToolProgress) => void): Promise<string> {
+  const low = [
+    ...(Bun.which('nice') ? ['nice', '-n', '15'] : []),
+    ...(Bun.which('ionice') ? ['ionice', '-c', '3'] : []),
+  ]
+  return runRenderer([...low, worldBinary(), ...args], onProgress, undefined, 'flytower-world')
+}
 
 /** The one world service for this process. */
 export function useWorld(): WorldService {
@@ -19,6 +38,8 @@ export function useWorld(): WorldService {
     readProperties,
     writeProperties,
     stopped: (name) => useConsole().forget(name),
+    worldTool: runWorldTool,
+    notify: (e) => useNotify().notify(e),
   })
   return service
 }

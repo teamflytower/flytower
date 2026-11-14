@@ -10,6 +10,7 @@ import {
   DISK_URGENT,
   DISK_WARN,
   SYSTEM_PARTS,
+  biggestWorld,
   type CleanUp,
   type SystemPart,
 } from '~~/shared/disk'
@@ -128,6 +129,14 @@ const cleanOpen = computed({
 })
 const can = useCan()
 const canManage = computed(() => can('system.updates'))
+
+/** When a world is the biggest thing on the disk, trimming it is the best place to start. */
+const trimTip = computed(() => {
+  const big = data.value ? biggestWorld(data.value) : null
+  if (!big || !can('world.manage', big.server)) return null
+  const s = servers.value.find((x) => x.server === big.server)
+  return { ...big, displayName: s?.displayName ?? big.server }
+})
 
 const totalBytes = computed(() => (data.value?.totalMb ?? 0) * MB)
 const width = (bytes: number) =>
@@ -322,6 +331,26 @@ async function measureNow() {
           </tr>
         </tbody>
       </table>
+    </div>
+
+    <div
+      v-if="trimTip"
+      class="flex flex-wrap items-center justify-between gap-3 rounded-md border border-default p-3 text-sm"
+      data-e2e="disk-trim-tip"
+    >
+      <p class="max-w-xl text-muted">
+        <span class="text-default">{{ trimTip.displayName }}'s world</span> is the biggest thing on
+        this disk, at {{ humanBytes(trimTip.bytes) }}. Trimming chunks nobody has spent time in can
+        make it smaller.
+      </p>
+      <UButton
+        :to="`/servers/${trimTip.server}/world?trim#tools`"
+        label="Trim unused chunks"
+        icon="i-lucide-scissors"
+        size="sm"
+        color="neutral"
+        variant="outline"
+      />
     </div>
 
     <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-muted">

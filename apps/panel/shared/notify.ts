@@ -60,6 +60,11 @@ export const EVENT_KINDS = {
   },
   'player.joined': { group: 'activity', label: 'A player joined', perServer: true },
   'player.left': { group: 'activity', label: 'A player left', perServer: true },
+  'world.trimmed': {
+    group: 'activity',
+    label: 'Unused chunks were trimmed from a world',
+    perServer: true,
+  },
 } as const satisfies Record<string, { group: EventGroup; label: string; perServer?: boolean }>
 export type EventKind = keyof typeof EVENT_KINDS
 

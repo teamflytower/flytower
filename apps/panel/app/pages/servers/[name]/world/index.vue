@@ -63,15 +63,8 @@ const sections = computed<CollapsibleSection[]>(() => [
       <div class="space-y-6">
         <WorldPregen />
         <WorldCopy />
+        <WorldTrim />
         <WorldReset />
-        <section class="rounded-lg border border-default p-5">
-          <h2 class="text-base font-semibold">Trim unused chunks</h2>
-          <p class="mt-1 text-sm text-muted">
-            Remove the parts of the world nobody has spent time in, so it takes less space. They are
-            generated again, fresh, if anyone goes there.
-          </p>
-          <WorldTrimRules class="mt-4" />
-        </section>
       </div>
     </template>
   </CollapsibleSections>

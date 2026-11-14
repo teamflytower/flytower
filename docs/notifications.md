@@ -32,6 +32,7 @@ The notification channels, on System, Notifications.
 | Activity | A server started or stopped                         | The moment players can join, and the moment it starts shutting down, however it happened.                                           |
 | Activity | A server restarted from the panel                   | "Restarting" when you press **Restart**, then "Restarted" once players can join again.                                              |
 | Activity | A player joined or left                             | The moment it happens.                                                                                                              |
+| Activity | Unused chunks were trimmed                          | When a trim finishes, with how many chunks went and the space it freed. See [Trim unused chunks](trim.md).                          |
 
 New channels start with the problems and updates ticked, and the activity left off. Channels made before crash alerts and scheduled-task alerts existed get them ticked if they already had any problem ticked.
 
@@ -77,7 +78,7 @@ For anything else (Slack through a workflow, Home Assistant, your own script), F
 }
 ```
 
-`kind` is one of `backup.failed`, `offsite.failed`, `disk.full`, `update.flytower`, `update.content`, `server.started`, `server.stopped`, `server.restarted`, `player.joined`, `player.left` or `test`. `severity` is `critical`, `warning`, `info` or `ok` ("back to normal"). `server` is `null` for machine-wide events.
+`kind` is one of `backup.failed`, `offsite.failed`, `disk.full`, `update.flytower`, `update.content`, `server.started`, `server.stopped`, `server.restarted`, `player.joined`, `player.left`, `world.trimmed` or `test`. `severity` is `critical`, `warning`, `info` or `ok` ("back to normal"). `server` is `null` for machine-wide events.
 
 Headers: `X-Flytower-Event` (the kind), `X-Flytower-Delivery` (the id, the same across retries) and, if you set a signing secret, `X-Flytower-Signature`.
 

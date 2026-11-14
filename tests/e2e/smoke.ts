@@ -587,6 +587,63 @@ try {
       `exported the world and downloaded it through a share link (${zipRes.headers.get('content-length')} bytes)`,
     )
 
+    // Trim unused chunks through the UI: keep only a protected area round the gold block, so
+    // the rest of the spawn area goes, then check the block survived and the server is back.
+    const rules = await api(view, '/api/servers/smoke/world/trim-rules', {
+      method: 'PATCH',
+      body: {
+        spawnRadius: 0,
+        playerRadius: 0,
+        buffer: 0,
+        protect: [{ name: 'Gold', dimension: 'overworld', from: [-16, -16], to: [15, 15] }],
+      },
+    })
+    if (rules.status !== 200) throw new Error(`trim rules: ${JSON.stringify(rules.body)}`)
+    await view.navigate(`${base}/servers/smoke/world#tools`)
+    await until('the Preview and trim button', () =>
+      view.evaluate<boolean>(`!!document.querySelector('[data-e2e=trim-open]')`),
+    )
+    await view.click('[data-e2e=trim-open]')
+    const preview = await until(
+      'the trim preview',
+      () =>
+        view.evaluate<string | null>(`(() => {
+          const s = document.querySelector('[data-e2e=trim-summary]')
+          if (s) return s.innerText.trim()
+          const a = document.querySelector('[role=dialog] [role=alert]')
+          return a ? 'failed: ' + a.innerText : null
+        })()`),
+      3 * 60_000,
+      1000,
+    )
+    if (!/would remove/.test(preview)) throw new Error(`trim preview: ${preview}`)
+    await shot('3a-trim-preview')
+    await view.click('[data-e2e=trim-confirm]')
+    const trimmed = await until(
+      'the trim to finish',
+      () =>
+        view.evaluate<string | null>(`(() => {
+          const t = document.body.innerText
+          const i = t.indexOf('World trimmed')
+          if (i >= 0) return 'ok: ' + t.slice(i, i + 200)
+          const f = t.indexOf("That didn't work")
+          return f >= 0 ? t.slice(f, f + 300) : null
+        })()`),
+      5 * 60_000,
+      1000,
+    )
+    if (!trimmed.startsWith('ok')) throw new Error(`trim failed: ${trimmed}`)
+    await until(
+      'RCON after the trim',
+      async () =>
+        (await api(view, '/api/servers/smoke/command', { body: { command: 'list' } })).status ===
+        200,
+      5 * 60_000,
+      2000,
+    )
+    if (!(await goldIsThere())) throw new Error('trimming removed the protected gold block')
+    step(`previewed and trimmed unused chunks: ${preview.slice(0, 120)}`)
+
     const stopped = await api(view, '/api/servers/smoke/stop', { body: {} })
     if (stopped.status !== 200) throw new Error(`stop failed: ${JSON.stringify(stopped.body)}`)
     step('server stopped')
