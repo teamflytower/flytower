@@ -11,9 +11,9 @@ use std::fmt::Write as _;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread;
+
+use flytower_anvil::parallel;
 
 use crate::draw;
 use crate::palette::{Palette, fnv};
@@ -267,32 +267,6 @@ pub fn level_tiles(tile_dir: &Path, level: u8) -> Vec<(i32, i32)> {
         .collect();
     out.sort_unstable();
     out
-}
-
-/// Runs `f` over `items` on up to `threads` threads, keeping the results in order.
-fn parallel<T: Sync, R: Send>(items: &[T], threads: usize, f: impl Fn(&T) -> R + Sync) -> Vec<R> {
-    let next = AtomicUsize::new(0);
-    let results: Mutex<Vec<Option<R>>> = Mutex::new((0..items.len()).map(|_| None).collect());
-    thread::scope(|s| {
-        for _ in 0..threads.clamp(1, items.len().max(1)) {
-            s.spawn(|| {
-                loop {
-                    let i = next.fetch_add(1, Ordering::Relaxed);
-                    let Some(item) = items.get(i) else { break };
-                    let r = f(item);
-                    results
-                        .lock()
-                        .unwrap_or_else(std::sync::PoisonError::into_inner)[i] = Some(r);
-                }
-            });
-        }
-    });
-    results
-        .into_inner()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .into_iter()
-        .flatten()
-        .collect()
 }
 
 // The state file: a stamp line, then `x z hash` per drawn region and `x z hash empty` for
