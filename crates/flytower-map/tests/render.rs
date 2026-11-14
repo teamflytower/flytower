@@ -8,6 +8,7 @@ use flate2::Compression;
 use flate2::write::{GzEncoder, ZlibEncoder};
 use flytower_map::palette::Palette;
 use flytower_map::render::{Options, render, render_with};
+use flytower_map::world::MapDimension;
 use flytower_map::{manifest, tiles, world};
 use std::sync::atomic::{AtomicU32, Ordering};
 

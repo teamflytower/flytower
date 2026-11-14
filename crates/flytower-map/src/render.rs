@@ -19,7 +19,7 @@ use crate::draw;
 use crate::palette::{Palette, fnv};
 use crate::region::{self, Region};
 use crate::tiles;
-use crate::world::Dimension;
+use crate::world::{Dimension, MapDimension};
 
 /// Bump when drawing changes, so every map is redrawn once.
 pub const RENDERER: u32 = 2;

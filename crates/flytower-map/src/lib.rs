@@ -29,7 +29,7 @@ pub use flytower_anvil::{nbt, region};
 use std::fmt::Write as _;
 use std::path::Path;
 
-use world::Dimension;
+use world::{Dimension, MapDimension};
 
 /// The `maps.json` format. Bump it if a field changes meaning.
 pub const MANIFEST: u32 = 1;
