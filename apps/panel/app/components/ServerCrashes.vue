@@ -132,7 +132,7 @@ function rowMenu(e: ServerEvent) {
             </div>
             <div
               v-if="open === e.id"
-              class="mt-2 max-h-80 overflow-y-auto rounded-md border border-default bg-[#0b0e14] px-3 py-2 font-mono text-xs leading-relaxed"
+              class="dark mt-2 max-h-80 overflow-y-auto rounded-md border border-default bg-[#0b0e14] px-3 py-2 font-mono text-xs leading-relaxed"
             >
               <div
                 v-for="(line, i) in e.logTail"

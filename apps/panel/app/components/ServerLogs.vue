@@ -184,7 +184,7 @@ async function reload() {
         <div
           v-else
           ref="scroller"
-          class="min-h-0 flex-1 overflow-y-auto rounded-lg border border-default bg-[#0b0e14] px-4 py-3 font-mono text-[13px] leading-relaxed"
+          class="dark min-h-0 flex-1 overflow-y-auto rounded-lg border border-default bg-[#0b0e14] px-4 py-3 font-mono text-[13px] leading-relaxed"
           role="log"
           :aria-label="selected"
         >
