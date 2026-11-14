@@ -9,7 +9,7 @@ Flytower installs on a fresh **Ubuntu 24.04+** or **Debian 12+** server (amd64 o
 
 You need:
 
-- A VPS with at least 4 GB of RAM (8 GB if you want more than one server running).
+- A VPS with at least 4 GB of RAM (8 GB if you want more than one server running). [Choosing a VPS](choosing-a-vps.md) helps you pick one.
 - A domain name you can add a DNS record to, for the panel itself (for example `panel.example.com`). Passkeys only work over HTTPS on a real name, and Flytower gets the certificate for you.
 
 ## Option A: Hetzner Cloud, no SSH at all
@@ -17,7 +17,7 @@ You need:
 1. **Pick a setup token.** Any long random string, for example from a password manager. You'll type it into the panel once.
 2. In the Hetzner Cloud console, create a server:
    - **Image:** Ubuntu 24.04
-   - **Type:** CPX21 or larger (CPX31 for a few servers)
+   - **Type:** CPX22 or larger (CPX32 for a few servers). The older CPX21 and CPX31 are now only sold in the US.
    - **Networking:** keep a public IPv4
    - **Cloud config:** paste this, with your domain and token:
 
