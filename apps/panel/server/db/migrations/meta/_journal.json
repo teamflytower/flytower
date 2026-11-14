@@ -169,6 +169,13 @@
       "when": 1794400243676,
       "tag": "0023_recovery_lookup",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1794689846693,
+      "tag": "0024_trim_rules",
+      "breakpoints": true
     }
   ]
 }

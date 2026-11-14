@@ -95,5 +95,9 @@ export const migrations: { tag: string; sql: string }[] = [
   {
     "tag": "0023_recovery_lookup",
     "sql": "ALTER TABLE `recovery_codes` ADD `lookup` text;--> statement-breakpoint\nCREATE INDEX `recovery_codes_lookup` ON `recovery_codes` (`lookup`);"
+  },
+  {
+    "tag": "0024_trim_rules",
+    "sql": "ALTER TABLE `servers` ADD `trim` text;"
   }
 ]
