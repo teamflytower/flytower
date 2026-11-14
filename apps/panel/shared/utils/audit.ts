@@ -323,6 +323,8 @@ export function describeAudit(
       return `Reset ${t}'s world${d.seed ? ` with seed ${str(d.seed)}` : d.random ? ' with a new seed' : ''}`
     case 'world.copy':
       return `Copied ${str(d.from)}'s world into ${t}`
+    case 'world.trim_rules':
+      return `Changed what trimming keeps on ${t}${d.summary ? `: ${str(d.summary)}` : ''}`
   }
   if (action.startsWith('world.pregen.')) {
     const what = action.slice(13)

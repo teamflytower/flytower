@@ -2,6 +2,7 @@ import type { ContentItem } from '../../shared/spec'
 import type { PublicPage } from '../../shared/public-page'
 import type { StatsSettings } from '../../shared/stats-settings'
 import type { MapSettings } from '../../shared/map-settings'
+import type { TrimRules } from '../../shared/trim-rules'
 import type { StoredRelay } from '../../shared/discord-relay'
 import type { Permission } from '../../shared/permissions'
 import { sql } from 'drizzle-orm'
@@ -114,6 +115,8 @@ export const servers = sqliteTable(
     stats: text('stats', { mode: 'json' }).$type<StatsSettings>(),
     /** The web map's settings; null until it's first set. */
     map: text('map', { mode: 'json' }).$type<MapSettings>(),
+    /** What "Trim unused chunks" keeps (spec `world.trim`); null until it's first set. */
+    trim: text('trim', { mode: 'json' }).$type<TrimRules>(),
     /** Game chat to a Discord channel's webhook (URL sealed); null when it's off. */
     discordRelay: text('discord_relay', { mode: 'json' }).$type<StoredRelay>(),
     createdAt: createdAt(),

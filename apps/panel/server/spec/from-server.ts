@@ -3,6 +3,7 @@ import { isManagedProperty, type ServerSpec } from '../../shared/spec'
 import { readPublicPage } from '../../shared/public-page'
 import { isDefaultStats, readStatsSettings } from '../../shared/stats-settings'
 import { isDefaultMap, readMapSettings } from '../../shared/map-settings'
+import { isDefaultTrim, readTrimRules } from '../../shared/trim-rules'
 import { ScheduleItem, toItem, type TaskSpec } from '../../shared/schedules'
 import type { schema } from '../db'
 
@@ -125,6 +126,9 @@ export function specFromServer(
       ? { stats: readStatsSettings(row.stats) }
       : {}),
     ...(!isDefaultMap(readMapSettings(row.map)) ? { map: readMapSettings(row.map) } : {}),
+    ...(!isDefaultTrim(readTrimRules(row.trim))
+      ? { world: { trim: readTrimRules(row.trim) } }
+      : {}),
     ...(tasks.length ? { schedules: tasks.map((t) => ScheduleItem.parse(toItem(t))) } : {}),
   }
 }

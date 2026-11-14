@@ -34,7 +34,7 @@ const sections = computed<CollapsibleSection[]>(() => [
     id: 'tools',
     label: 'Tools',
     icon: 'i-lucide-hammer',
-    description: 'Pre-generate, copy or reset the world',
+    description: 'Pre-generate, copy, reset or trim the world',
     need: { permission: 'world.manage', text: 'You can see the world but not change it.' },
   },
 ])
@@ -64,6 +64,14 @@ const sections = computed<CollapsibleSection[]>(() => [
         <WorldPregen />
         <WorldCopy />
         <WorldReset />
+        <section class="rounded-lg border border-default p-5">
+          <h2 class="text-base font-semibold">Trim unused chunks</h2>
+          <p class="mt-1 text-sm text-muted">
+            Remove the parts of the world nobody has spent time in, so it takes less space. They are
+            generated again, fresh, if anyone goes there.
+          </p>
+          <WorldTrimRules class="mt-4" />
+        </section>
       </div>
     </template>
   </CollapsibleSections>
