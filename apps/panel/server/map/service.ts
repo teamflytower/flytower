@@ -375,14 +375,15 @@ export function parseProgress(line: string): MapProgress | null {
 export const STALL_MS = 10 * 60_000
 
 /**
- * Runs a `flytower-map` command line and returns what it prints. A run that reports no
- * progress for `stallMs` (from the start, or since the last progress line) is killed, so a
- * stuck renderer can't hold up the maps behind it.
+ * Runs a `flytower-map` (or `flytower-world`) command line and returns what it prints. A run
+ * that reports no progress for `stallMs` (from the start, or since the last progress line) is
+ * killed, so a stuck tool can't hold up the work behind it.
  */
 export async function runRenderer(
   cmd: string[],
   onProgress?: (p: MapProgress) => void,
   stallMs = STALL_MS,
+  tool = 'flytower-map',
 ): Promise<string> {
   const proc = Bun.spawn(cmd, { stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
   let stalled = false
@@ -406,10 +407,10 @@ export async function runRenderer(
     ])
     if (stalled) {
       throw new Error(
-        `flytower-map made no progress for ${Math.round(stallMs / 60_000)} minutes, so it was stopped`,
+        `${tool} made no progress for ${Math.round(stallMs / 60_000)} minutes, so it was stopped`,
       )
     }
-    if (code !== 0) throw new Error(err.trim() || `flytower-map exited with ${code}`)
+    if (code !== 0) throw new Error(err.trim() || `${tool} exited with ${code}`)
     return out
   } finally {
     clearTimeout(timer)
