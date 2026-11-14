@@ -5,7 +5,8 @@ plugins {
     id 'net.fabricmc.fabric-loom' version "${loom_version}"
 }
 
-version = providers.gradleProperty('mod_version').getOrElse('0.0.0-dev')
+// Its own version (gradle.properties), not Flytower's: see the note there.
+version = providers.gradleProperty('mod_version').get()
 group = 'dev.flytower'
 base.archivesName = 'flytower-proxy'
 

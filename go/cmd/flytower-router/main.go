@@ -33,8 +33,10 @@ import (
 	"github.com/teamflytower/flytower/go/router/handshake"
 )
 
-// version is set when releases are packaged (scripts/package.ts), with
-// -ldflags "-X main.version=1.5.0".
+// version is the release this binary came with. Releases don't stamp it in at build time:
+// the binary would then differ in every release, and the agent restarts the router (dropping
+// every player) whenever its binary changes. It's read from the release's VERSION file instead
+// (see releaseVersion). -ldflags "-X main.version=..." still works for a build of your own.
 var version = "dev"
 
 const (
@@ -43,7 +45,34 @@ const (
 )
 
 func main() {
+	version = releaseVersion(version)
 	os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
+}
+
+// releaseVersion is the version stamped in at build time, or else the one in the VERSION file
+// of the release this binary is in (<release>/bin/flytower-router beside <release>/VERSION).
+func releaseVersion(stamped string) string {
+	if stamped != "dev" {
+		return stamped
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		return stamped
+	}
+	return versionBeside(exe, stamped)
+}
+
+// versionBeside reads <dir of exe>/../VERSION, or returns fallback.
+func versionBeside(exe, fallback string) string {
+	b, err := os.ReadFile(filepath.Join(filepath.Dir(exe), "..", "VERSION"))
+	if err != nil {
+		return fallback
+	}
+	v := strings.TrimSpace(string(b))
+	if v == "" || len(v) > 64 || strings.ContainsAny(v, " \t\n") {
+		return fallback
+	}
+	return v
 }
 
 func usage(w io.Writer) {

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"net"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -21,6 +22,26 @@ func TestVersion(t *testing.T) {
 		if got := out.String(); got != "flytower-router dev\n" {
 			t.Errorf("%q: printed %q", args, got)
 		}
+	}
+}
+
+func TestVersionFromRelease(t *testing.T) {
+	release := t.TempDir()
+	exe := filepath.Join(release, "bin", "flytower-router")
+	if got := versionBeside(exe, "dev"); got != "dev" {
+		t.Errorf("no VERSION file: got %q", got)
+	}
+	if err := os.WriteFile(filepath.Join(release, "VERSION"), []byte("1.5.0-beta.2\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(release, "bin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if got := versionBeside(exe, "dev"); got != "1.5.0-beta.2" {
+		t.Errorf("got %q", got)
+	}
+	if got := releaseVersion("1.2.3"); got != "1.2.3" {
+		t.Errorf("a stamped version wins: got %q", got)
 	}
 }
 
