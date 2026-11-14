@@ -5,7 +5,7 @@ order: 1.5
 
 # Choosing a VPS
 
-Flytower runs on a virtual private server (VPS) that you rent from a hosting company. This page covers what to look for. You only need to read it once, before you [install](install.md).
+Flytower runs on a virtual private server (VPS) that you rent from a hosting company, or on a machine at home such as a Raspberry Pi. This page covers what to look for. You only need to read it once, before you [install](install.md).
 
 ## What Flytower needs
 
@@ -48,6 +48,22 @@ Backups on the same machine won't help if the machine is lost, so it's worth [co
 ## Location
 
 Choose a data centre close to your players. Every 1,000 km adds roughly 10 milliseconds to each round trip. For a UK group, anywhere in western Europe is fine.
+
+## At home, on a Raspberry Pi
+
+You don't have to rent a VPS. A **Raspberry Pi 5 with 8 GB** runs Flytower well, with room for one or two small servers, and costs nothing a month after you've bought it.
+
+- Install the **64-bit** Raspberry Pi OS (or Ubuntu Server 24.04 for the Pi). Flytower needs arm64, so the 32-bit OS won't work.
+- Boot from an SSD or NVMe drive rather than the SD card. Minecraft writes to disk constantly, and SD cards are slow and wear out.
+- Use a wired network connection and the official power supply.
+
+A machine at home needs a little more setting up than a VPS, because your router sits between it and the internet:
+
+- **A public IPv4 address.** Some broadband providers share one address between many homes (called CGNAT), which stops anyone outside reaching your Pi. Your router's status page shows its internet address; if it doesn't match what a site like `ifconfig.me` reports, ask your provider for a public IPv4 address.
+- **Port forwarding.** Forward ports 80 and 443 (for the panel) and each Minecraft server's port, starting at 25565, from your router to the Pi.
+- **An address that stays the same.** If your home IP address changes from time to time, use your router's dynamic DNS feature, or your DNS provider's, to keep your domain pointing at it.
+
+Then follow the [install guide](install.md) over SSH, the same as on a VPS.
 
 ## Providers
 

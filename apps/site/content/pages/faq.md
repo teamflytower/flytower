@@ -15,7 +15,7 @@ Yes. Flytower is free software under the [AGPL-3.0](https://github.com/teamflyto
 
 ## What do I need?
 
-- A VPS running Ubuntu 24.04+ or Debian 12+, with at least 4 GB of memory. [Choosing a VPS](/docs/choosing-a-vps) explains what to look for.
+- A VPS or a machine at home, such as a Raspberry Pi 5, running Ubuntu 24.04+ or Debian 12+ with at least 4 GB of memory. [Choosing a VPS](/docs/choosing-a-vps) explains what to look for.
 - A domain name for the panel's address, such as `panel.example.com`.
 
 Then follow the [install guide](/docs/install). It takes about five minutes.
@@ -78,7 +78,7 @@ Yes. Invite them with a link and choose what they can do, on one server or all o
 
 ## Can I run it at home?
 
-Not yet. Flytower expects a VPS with a public IPv4 address. Running on a home connection, behind a router, is something we'd like to support later.
+Yes. A Raspberry Pi 5 with 8 GB runs Flytower well, with room for one or two small servers and nothing to pay each month. You'll need a public IPv4 address from your broadband provider and a few ports forwarded on your router. [Choosing a VPS](/docs/choosing-a-vps#at-home-on-a-raspberry-pi) walks through it.
 
 ## How do players join?
 
