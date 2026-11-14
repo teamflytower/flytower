@@ -72,7 +72,7 @@ Commit and pull request titles use Conventional Commits (`feat:`, `fix:`, `docs:
 | `packages/protocol`  | Shared message schemas between the panel and the agent                                        |
 | `packages/providers` | Where servers and content come from (Mojang, Fabric, Paper, Modrinth, Hangar, Vanilla Tweaks) |
 | `packages/rcon`      | Minecraft RCON client                                                                         |
-| `crates/`            | Rust helpers: the agent, the updater, `flytower-du` and `flytower-map`                        |
+| `crates/`            | Rust helpers: the agent, the updater, `flytower-du`, `flytower-map` and `flytower-world`      |
 | `go/`                | Go helpers: `flytower-router`, and the protocol envelope in Go                                |
 | `mods/`              | Minecraft mods Flytower ships: `flytower-proxy`, which shows real addresses behind the router |
 | `protocol/`          | The agent protocol exported as JSON Schema, and fixtures every language replays               |
