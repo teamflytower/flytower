@@ -43,8 +43,8 @@ const comparison = [
             {{ site.announcement.text }}
             <UIcon name="i-lucide-arrow-right" class="size-4" />
           </ULink>
-          <h1 class="font-display text-5xl leading-[0.95] uppercase sm:text-7xl xl:text-[80px]">
-            Every Minecraft server on your VPS, <span class="text-primary">in one tab</span>
+          <h1 class="font-display text-5xl leading-[0.95] uppercase sm:text-7xl xl:text-[96px]">
+            A <span class="text-primary">new kind</span> of Minecraft panel
           </h1>
           <p class="max-w-xl text-lg text-muted sm:text-xl">
             A free, self-hosted panel. Install it once, sign in with a passkey, and run vanilla,
