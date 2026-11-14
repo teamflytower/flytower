@@ -16,6 +16,9 @@
   --font-display:
     'Big Shoulders Display Variable', 'Big Shoulders Display', 'Arial Narrow', sans-serif;
 
+  /* Extra-wide screens: the home page's "Also included" grid goes to one row of 8 */
+  --breakpoint-3xl: 106.25rem; /* 1700px, in rem so it sorts after the built-in breakpoints */
+
   /* Tungsten: brand amber (primary) */
   --color-tungsten-50: #fff8eb;
   --color-tungsten-100: #feebc8;

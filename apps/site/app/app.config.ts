@@ -10,6 +10,12 @@ export default defineAppConfig({
     sponsors: 'https://github.com/sponsors/MattA-Official',
     kofi: '', // set once the Ko-fi page exists
     discord: '', // set once the Discord server exists
+    /** The pill above the home page heading. Update it with each minor release. */
+    announcement: {
+      label: 'New in 1.4',
+      text: 'Roles and permissions, Discord chat',
+      to: '/changelog',
+    },
     install:
       'curl -fsSL https://flytower.dev/install.sh | sudo bash -s -- --domain panel.example.com',
   },
