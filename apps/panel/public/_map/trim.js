@@ -136,6 +136,15 @@
       ctx.drawImage(r.image, x0, y0, x1 - x0, y1 - y0)
     }
     ctx.globalAlpha = 1
+    // Protected areas are always kept, so nothing inside one is ever shaded, even an area
+    // drawn since the preview.
+    for (const a of rules.protect) {
+      if (fullId(a.dimension) !== dim) continue
+      const [bx0, bz0, bx1, bz1] = areaBlocks(a)
+      const [x0, y0] = map.toScreen(bx0, bz0)
+      const [x1, y1] = map.toScreen(bx1, bz1)
+      ctx.clearRect(x0, y0, x1 - x0, y1 - y0)
+    }
 
     // Protected areas, with their names.
     ctx.font = '600 12px system-ui, sans-serif'
