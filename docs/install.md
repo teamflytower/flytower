@@ -34,6 +34,12 @@ You need:
 ## Option B: an existing server over SSH
 
 ```sh
+curl -fsSL https://flytower.dev/install.sh | sudo bash -s -- --domain panel.example.com
+```
+
+`flytower.dev/install.sh` just redirects to the latest release's installer on GitHub. If you'd rather fetch it from GitHub yourself, this does the same:
+
+```sh
 curl -fsSL https://github.com/teamflytower/flytower/releases/latest/download/install.sh \
   | sudo bash -s -- --domain panel.example.com
 ```
