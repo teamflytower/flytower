@@ -2,131 +2,141 @@
 const site = useAppConfig().site
 useSeoMeta({ title: site.name, description: site.tagline })
 
-const features = [
+const comparison = [
   {
-    icon: 'i-lucide-terminal-square',
-    title: 'One install, then the browser',
-    description:
-      'A single command sets up the panel on a fresh Ubuntu or Debian VPS. Java, servers, mods and datapacks are all managed from the browser after that, and you sign in with a passkey.',
+    row: 'Where the world lives',
+    ours: 'On a machine you rent and control',
+    hosted: "On the host's machines",
   },
   {
-    icon: 'i-lucide-file-code-2',
-    title: 'Specs, not scripts',
-    description:
-      'Each server is a short YAML spec. Edit it as a form or paste the YAML, see what will change, then apply it.',
+    row: 'Several servers',
+    ours: 'As many as the box can run',
+    hosted: 'Usually one plan per server',
   },
   {
-    icon: 'i-lucide-shield-check',
-    title: 'Trusted sources, no lock-in',
-    description:
-      'Mojang, Fabric, PaperMC, Modrinth, Hangar and Vanilla Tweaks are built in. Every server folder is an ordinary server folder that still runs without Flytower.',
+    row: 'Leaving',
+    ours: 'Stop using Flytower; your servers keep running',
+    hosted: 'Download your world and start again',
   },
   {
-    icon: 'i-lucide-server',
-    title: 'Many servers per box',
-    description:
-      'Each server gets its own user, folder, memory limit, port and hostname, so a survival world and a test server can share one machine safely.',
-  },
-  {
-    icon: 'i-lucide-life-buoy',
-    title: 'Looked after',
-    description:
-      'Scheduled backups with off-site copies, performance history, an activity log, notifications to Discord or ntfy, and signed self-updates that roll back if they fail.',
-  },
-  {
-    icon: 'i-lucide-eye-off',
-    title: 'Yours, not ours',
-    description:
-      'Flytower runs on your VPS and has no telemetry. It is free software under the AGPL-3.0, so you can read, change and share every line.',
-  },
-]
-
-const parts = [
-  {
-    title: 'The panel',
-    description:
-      'The web app. It runs as an unprivileged user, listens only on localhost, and Caddy puts it on HTTPS with your domain.',
-  },
-  {
-    title: 'The agent',
-    description:
-      'A small root helper that does a fixed list of jobs over a Unix socket: creating server users and folders, systemd units, Java, firewall ports and updates.',
-  },
-  {
-    title: 'Your servers',
-    description:
-      'Each runs as its own user from its own folder under systemd, with a fixed memory limit. Nothing about them depends on Flytower.',
+    row: 'Who does the admin',
+    ours: 'You, with a panel that makes it easy',
+    hosted: 'The host',
   },
 ]
 </script>
 
 <template>
-  <div>
-    <UPageHero
-      :description="
-        site.tagline +
-        ' Install it once, then create, configure and look after any number of servers without SSH.'
-      "
-      orientation="vertical"
-      :links="[
-        { label: 'Install Flytower', to: '/docs/install', icon: 'i-lucide-download', size: 'xl' },
-        {
-          label: 'Read the docs',
-          to: '/docs',
-          color: 'neutral',
-          variant: 'subtle',
-          size: 'xl',
-          trailingIcon: 'i-lucide-arrow-right',
-        },
-      ]"
+  <div class="overflow-x-clip">
+    <section
+      class="border-b border-default bg-[radial-gradient(ellipse_55%_70%_at_85%_10%,color-mix(in_oklab,var(--ui-primary)_10%,transparent),transparent_70%)]"
     >
-      <template #title>
-        <span class="font-display block text-5xl sm:text-7xl">Your servers.</span>
-        <span class="font-display block text-5xl text-primary sm:text-7xl">Your box.</span>
-      </template>
-      <div class="flex flex-col items-center gap-2">
-        <InstallCommand />
-        <p class="text-sm text-muted">
-          Ubuntu 24.04+ or Debian 12+, amd64 or arm64.
-          <ULink to="/docs/install" class="text-primary">Installer options</ULink>
+      <UContainer
+        class="grid items-center gap-12 pt-16 lg:gap-16 pb-20 sm:pt-20 lg:grid-cols-[1fr_1.25fr] lg:pb-28"
+      >
+        <div class="flex min-w-0 flex-col gap-6">
+          <ULink
+            :to="site.announcement.to"
+            class="inline-flex items-center gap-2 self-start rounded-full border border-accented px-3.5 py-1 text-sm text-toned hover:border-primary"
+          >
+            <span class="font-semibold text-primary">{{ site.announcement.label }}</span>
+            {{ site.announcement.text }}
+            <UIcon name="i-lucide-arrow-right" class="size-4" />
+          </ULink>
+          <h1 class="font-display text-5xl leading-[0.95] uppercase sm:text-7xl xl:text-[80px]">
+            Every Minecraft server on your VPS, <span class="text-primary">in one tab</span>
+          </h1>
+          <p class="max-w-xl text-lg text-muted sm:text-xl">
+            A free, self-hosted panel. Install it once, sign in with a passkey, and run vanilla,
+            Fabric and Paper servers without touching SSH.
+          </p>
+          <div class="flex flex-col gap-2">
+            <InstallCommand class="max-w-xl" />
+            <p class="text-sm text-muted">
+              Ubuntu 24.04+ or Debian 12+, amd64 or arm64, and a domain.
+              <ULink to="/docs/install" class="text-primary">Installer options</ULink>
+            </p>
+          </div>
+          <div class="flex flex-wrap gap-3">
+            <UButton to="/docs/install" size="xl">Read the install guide</UButton>
+            <UButton to="#tour" size="xl" color="neutral" variant="outline">Take the tour</UButton>
+          </div>
+        </div>
+
+        <div class="relative min-w-0 pb-10 sm:pb-16 xl:-mr-40">
+          <div
+            class="overflow-hidden rounded-xl border border-accented bg-default shadow-[0_40px_120px_rgba(0,0,0,0.45)]"
+          >
+            <div
+              class="flex h-8 items-center gap-1.5 border-b border-default bg-elevated px-3.5"
+              aria-hidden="true"
+            >
+              <span class="size-2.5 rounded-full bg-accented" />
+              <span class="size-2.5 rounded-full bg-accented" />
+              <span class="size-2.5 rounded-full bg-accented" />
+              <span class="mx-auto font-mono text-[11px] text-dimmed">panel.example.com</span>
+            </div>
+            <img
+              src="/home/servers-dark.webp"
+              alt="Flytower's server list, with Survival and Creative running and Events stopped"
+              width="1440"
+              height="560"
+              class="block aspect-[1440/560] w-full object-cover object-top-left"
+              fetchpriority="high"
+            />
+          </div>
+          <div
+            class="absolute bottom-0 -left-3 w-3/5 overflow-hidden rounded-xl border border-accented shadow-[0_30px_80px_rgba(0,0,0,0.55)] sm:-left-6"
+          >
+            <img
+              src="/home/console-dark.webp"
+              alt="Survival's console, with players joining and chatting"
+              width="1440"
+              height="640"
+              class="block aspect-[1440/640] w-full object-cover object-top-left"
+            />
+          </div>
+        </div>
+      </UContainer>
+    </section>
+
+    <HomeTour />
+
+    <section class="border-y border-default bg-elevated/50 py-20 sm:py-24">
+      <UContainer>
+        <h2 class="font-display text-4xl uppercase sm:text-5xl">Your own box, or a hosted plan?</h2>
+        <p class="mt-3 max-w-2xl text-lg text-muted">
+          Both are good choices. Here's what changes when the machine is yours.
         </p>
-      </div>
-    </UPageHero>
-
-    <UPageSection
-      title="Everything a small community server needs"
-      description="Built for clubs, societies and groups of friends who want a proper panel on a VPS they control."
-    >
-      <UPageGrid>
-        <UPageCard
-          v-for="f in features"
-          :key="f.title"
-          :icon="f.icon"
-          :title="f.title"
-          :description="f.description"
-          variant="subtle"
-        />
-      </UPageGrid>
-    </UPageSection>
-
-    <UPageSection
-      title="How it fits together"
-      description="Three parts, each doing one job. If Flytower stopped tomorrow, your servers would carry on."
-    >
-      <UPageColumns class="md:columns-3">
-        <UPageCard
-          v-for="(p, i) in parts"
-          :key="p.title"
-          :title="`${i + 1}. ${p.title}`"
-          :description="p.description"
-        />
-      </UPageColumns>
-    </UPageSection>
+        <div class="mt-8 overflow-x-auto rounded-md border border-default">
+          <table class="w-full min-w-[640px] border-collapse text-[15px]">
+            <thead>
+              <tr class="bg-elevated text-left">
+                <td class="px-4 py-3.5" />
+                <th scope="col" class="px-4 py-3.5 font-semibold text-primary">
+                  Flytower on your VPS
+                </th>
+                <th scope="col" class="px-4 py-3.5 font-medium text-muted">
+                  A typical hosted plan
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="r in comparison" :key="r.row" class="border-t border-default">
+                <th scope="row" class="px-4 py-3.5 text-left font-medium">{{ r.row }}</th>
+                <td class="px-4 py-3.5">{{ r.ours }}</td>
+                <td class="px-4 py-3.5 text-muted">{{ r.hosted }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </UContainer>
+    </section>
 
     <UPageSection>
       <UPageCTA
         title="Why “Flytower”?"
-        description="A theatre's fly tower is the tall space above the stage where scenery hangs, ready to fly in on cue. Read where the name comes from."
+        description="A fly tower is the space above a stage where scenery hangs, ready to fly in on cue. Flytower does the same for servers: several hang in one box, and you bring each one in when it's needed."
         :links="[
           {
             label: 'Read the story',
@@ -141,14 +151,33 @@ const parts = [
     </UPageSection>
 
     <UPageSection
+      id="sponsors"
       title="Sponsors"
-      description="Flytower is free. Sponsors pay for the time it takes to build and maintain it."
+      description="Flytower is free. Sponsors pay for the time it takes to build and look after it."
     >
-      <div class="flex flex-col items-center gap-4 text-center">
-        <p class="text-muted">No sponsors yet. Your logo could be the first here.</p>
-        <UButton to="/sponsor" icon="i-lucide-heart" color="neutral" variant="outline"
-          >Become a sponsor</UButton
-        >
+      <div class="flex flex-col items-center gap-8">
+        <ul class="grid w-full max-w-4xl grid-cols-1 gap-4 sm:grid-cols-3">
+          <li v-for="n in 3" :key="n">
+            <ULink
+              to="/sponsor"
+              class="flex h-24 items-center justify-center rounded-lg border border-dashed border-accented text-[15px] text-dimmed hover:border-primary hover:text-highlighted"
+              >Your logo here</ULink
+            >
+          </li>
+        </ul>
+        <div class="flex flex-wrap items-center justify-center gap-3">
+          <UButton to="/sponsor" icon="i-lucide-heart" color="neutral" variant="outline" size="lg"
+            >Become a sponsor</UButton
+          >
+          <UButton
+            :to="site.sponsors + '?frequency=one-time'"
+            target="_blank"
+            color="neutral"
+            variant="link"
+            size="lg"
+            >or make a one-off donation</UButton
+          >
+        </div>
       </div>
     </UPageSection>
   </div>
