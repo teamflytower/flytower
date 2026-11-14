@@ -24,6 +24,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -180,9 +181,12 @@ func serve(args []string, stderr io.Writer) int {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 	go reloadOnHangup(ctx, r, *statePath, log)
+	// Set when the control socket fails, so that stop is reported as a failure, not a signal.
+	var ctlFailed atomic.Bool
 	go func() {
 		if err := ctl.Serve(ctx, cln); err != nil {
 			log.Error("control socket failed", "err", err)
+			ctlFailed.Store(true)
 			stop()
 		}
 	}()
@@ -190,6 +194,9 @@ func serve(args []string, stderr io.Writer) int {
 	ln, err := listenWhenFree(ctx, *listen, 2*time.Second, log)
 	if err != nil {
 		if ctx.Err() != nil {
+			if ctlFailed.Load() {
+				return 1
+			}
 			log.Info("stopped")
 			return 0
 		}
@@ -200,6 +207,9 @@ func serve(args []string, stderr io.Writer) int {
 		"routes", len(r.Table().Routes), "control", *controlPath)
 	if err := r.Serve(ctx, ln); err != nil {
 		log.Error("listener failed", "err", err)
+		return 1
+	}
+	if ctlFailed.Load() {
 		return 1
 	}
 	log.Info("stopped")

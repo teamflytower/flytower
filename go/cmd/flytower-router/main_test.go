@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"log/slog"
 	"net"
 	"os"
@@ -132,7 +133,7 @@ func TestListenGivesUpWhenStopped(t *testing.T) {
 	defer held.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
-	if _, err := listenWhenFree(ctx, held.Addr().String(), 10*time.Millisecond, slog.New(slog.DiscardHandler)); err == nil {
-		t.Fatal("expected an error once stopped")
+	if _, err := listenWhenFree(ctx, held.Addr().String(), 10*time.Millisecond, slog.New(slog.DiscardHandler)); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("got %v, want context.DeadlineExceeded", err)
 	}
 }
