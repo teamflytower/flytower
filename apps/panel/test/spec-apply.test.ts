@@ -413,6 +413,46 @@ describe('plan', () => {
     expect((await service.plan('survival', spec())).changes).toEqual([])
   })
 
+  it('saves trim rules without a restart, and shows them in the spec', async () => {
+    const { service, spec, db, calls } = setup()
+    const town = { name: 'Town', from: [-400, -300], to: [350, 420] } as const
+    const plan = await service.plan(
+      'survival',
+      spec({ world: { trim: { buffer: 4, protect: [town] } } }),
+    )
+    expect(plan.problems).toEqual([])
+    expect(plan.changes).toEqual([
+      {
+        area: 'settings',
+        action: 'set',
+        label: 'Trim rules',
+        from: 'Default rules',
+        to: '1 rule changed, 1 protected area',
+      },
+    ])
+    expect(plan.restart).toBe(false)
+    const before = calls.length
+    await (
+      await service.apply('survival', plan.id)
+    ).done
+    // Nothing is stopped, started or reconfigured.
+    expect(
+      calls
+        .slice(before)
+        .filter((c) => /^(service\.(stop|start|restart)|server\.configure)/.test(c)),
+    ).toEqual([])
+    const row = db.select().from(schema.servers).where(eq(schema.servers.name, 'survival')).get()
+    expect(row?.trim?.buffer).toBe(4)
+    expect(row?.trim?.protect).toEqual([{ ...town, dimension: 'overworld' }])
+    expect((await service.currentSpec('survival')).world?.trim?.protect).toHaveLength(1)
+    // Left out, the rules stay; the same rules are no change.
+    expect((await service.plan('survival', spec())).changes).toEqual([])
+    expect(
+      (await service.plan('survival', spec({ world: { trim: { buffer: 4, protect: [town] } } })))
+        .changes,
+    ).toEqual([])
+  })
+
   it('sets off-site storage by name, and refuses one that does not exist', async () => {
     const { service, spec, db, calls } = setup()
     const set = await service.plan('survival', spec({ backups: { offsite: 'b2' } }))
