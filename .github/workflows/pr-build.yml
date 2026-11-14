@@ -9,7 +9,8 @@ name: PR build
 # installer/pr-key.pem), never the release key. Only `install.sh --pr` trusts it; the
 # updaters don't. The release key lives in the `release` environment, which branches can't
 # reach.
-# Pull requests that only change docs, release notes or issue templates get no test build.
+# Pull requests that only change docs, release notes, issue templates or the code reviewer get
+# no test build.
 on:
   pull_request:
     types: [opened, synchronize, reopened, closed]
@@ -18,6 +19,9 @@ on:
       - 'README.md'
       - '.github/release-notes/**'
       - '.github/ISSUE_TEMPLATE/**'
+      - '.github/reviewer/**'
+      - '.github/workflows/review.yml'
+      - 'scripts/code-review*.ts'
 
 permissions:
   contents: read
