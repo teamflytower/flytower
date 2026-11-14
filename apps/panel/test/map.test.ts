@@ -423,6 +423,7 @@ describe('serving the map', () => {
     const html = viewerPage({ title: '<Survival & "co">', version: '1.3.0' })
     expect(html).toContain('<title>&lt;Survival &amp; &quot;co&quot;&gt; · Map</title>')
     expect(html).toContain('src="/_map/viewer.js?v=1.3.0"')
+    expect(html).toContain('src="/_map/trim.js?v=1.3.0"')
     expect(html).not.toContain('<Survival')
   })
 

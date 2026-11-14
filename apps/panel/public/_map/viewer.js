@@ -202,6 +202,7 @@
     }
     tilesLayer.classList.toggle('pixelated', s > 1)
     drawPlayers()
+    for (const fn of onDraw) fn()
     writeHash()
     if (!waiting) preload()
   }
@@ -595,6 +596,30 @@
         void refreshManifest()
       }
     })
+  }
+
+  // --- For overlays (trim.js): where things are, and a call after every draw. ---
+
+  const onDraw = []
+  window.flytowerMap = {
+    root,
+    /** Layers go under the markers and bars. */
+    insertLayer: (layer) => root.insertBefore(layer, markers),
+    el,
+    dimension: () => (current() ? current().id : null),
+    /** The screen position of a block, relative to the map. */
+    toScreen: (bx, bz) => {
+      const s = scale()
+      return [(bx - view.x) * s + root.clientWidth / 2, (bz - view.z) * s + root.clientHeight / 2]
+    },
+    /** The block at a point relative to the map. */
+    toBlocks: (px, py) => {
+      const s = scale()
+      return [view.x + (px - root.clientWidth / 2) / s, view.z + (py - root.clientHeight / 2) / s]
+    },
+    scale,
+    onDraw: (fn) => onDraw.push(fn),
+    redraw: () => draw(),
   }
 
   void start()
