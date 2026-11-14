@@ -24,6 +24,7 @@ export const SECTION_PERMISSIONS: Record<Section, ServerPermission> = {
   public: 'community.manage',
   stats: 'community.manage',
   map: 'community.manage',
+  world: 'world.manage',
 }
 
 /** What a refusal calls each permission's part of the server. */
@@ -33,6 +34,7 @@ export const SECTION_NAMES: Partial<Record<ServerPermission, string>> = {
   'schedules.manage': 'schedules',
   'backups.schedule': 'backup settings',
   'community.manage': 'community features',
+  'world.manage': 'world settings',
 }
 
 /** JSON with object keys sorted, so key order doesn't count as a change. */

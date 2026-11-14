@@ -474,6 +474,7 @@ export class SpecService {
         ...(s.publicPage ? { publicPage: s.publicPage } : {}),
         ...(s.stats ? { stats: s.stats } : {}),
         ...(s.map ? { map: s.map } : {}),
+        ...(s.trim ? { trim: s.trim } : {}),
         content: s.content,
       })
       .where(eq(schema.servers.name, name))

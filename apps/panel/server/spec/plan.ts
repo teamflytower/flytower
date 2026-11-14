@@ -32,6 +32,7 @@ import {
   sameMapSettings,
   type MapSettings,
 } from '../../shared/map-settings'
+import { describeTrim, readTrimRules, sameTrimRules, type TrimRules } from '../../shared/trim-rules'
 import { describeTask, sameTask, toTask, type TaskSpec } from '../../shared/schedules'
 import type { schema } from '../db'
 import { formatBytes } from '../backups/service'
@@ -79,6 +80,8 @@ export interface SettingsChange {
   stats?: StatsSettings
   /** Web map settings. */
   map?: MapSettings
+  /** What "Trim unused chunks" keeps. Never needs a restart. */
+  trim?: TrimRules
   content: ServerSpec['content']
 }
 
@@ -332,6 +335,23 @@ export async function makePlan(input: PlanInput): Promise<Plan> {
         label: 'Web map',
         from: describeMap(was),
         to: describeMap(spec.map),
+      })
+    }
+  }
+
+  if (spec.world?.trim) {
+    const was = readTrimRules(row.trim)
+    if (!sameTrimRules(was, spec.world.trim)) {
+      settings.trim = spec.world.trim
+      const from = describeTrim(was)
+      const to = describeTrim(spec.world.trim)
+      changes.push({
+        area: 'settings',
+        action: 'set',
+        label: 'Trim rules',
+        from,
+        // The summary can read the same when only a value changed.
+        to: to === from ? `${to}, updated` : to,
       })
     }
   }
