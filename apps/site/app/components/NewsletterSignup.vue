@@ -110,7 +110,7 @@ async function subscribe() {
     <p class="mt-2 text-sm text-muted">{{ CONSENT[CONSENT_VERSION] }}</p>
 
     <p v-if="state === 'done'" class="mt-4 text-sm" role="status">
-      Thanks. Before we send anything, we’ll email you to check it was you.
+      Thanks. Check your email to confirm.
     </p>
 
     <form v-else class="mt-4" novalidate @submit.prevent="subscribe">
