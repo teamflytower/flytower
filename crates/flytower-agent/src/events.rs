@@ -1,4 +1,4 @@
-//! Following systemd instead of asking it over and over, like `packages/agent/src/events.ts`.
+//! Following systemd instead of asking it over and over.
 //! systemd (PID 1) writes a journal line for every change to a unit: started, main process
 //! exited, failed, restart scheduled, stopped. `journalctl --follow` hands those over as they
 //! are written, and `service.wait` holds a request open until one concerns a server the panel

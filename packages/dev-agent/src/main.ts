@@ -2,20 +2,20 @@
  * A stand-in agent for working on the panel without root or systemd. It answers every verb
  * from memory: services take two seconds to start or stop, Java "installs" instantly, and
  * server folders are made under the dev data directory. Started servers write a log and
- * answer RCON (see dev-minecraft.ts). Never shipped.
+ * answer RCON (see minecraft.ts). Never shipped: boxes run the Rust agent in
+ * `crates/flytower-agent`.
  *
- *   bun run --filter @flytower/agent dev
+ *   bun run --filter @flytower/dev-agent dev
  */
 import type { Result } from '@flytower/protocol'
 import { mkdir, rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { unitName, userName } from '@flytower/protocol'
-import type { AgentContext } from './context.ts'
-import { protocolInfo, type Handlers } from './dispatch.ts'
-import { startFakeMinecraft } from './dev-minecraft.ts'
-import { listen } from './server.ts'
+import { protocolInfo, type AgentContext, type Handlers } from './dispatch.ts'
+import { serverUsage } from './disk.ts'
 import { UnitEvents } from './events.ts'
-import * as disk from './handlers/disk.ts'
+import { startFakeMinecraft } from './minecraft.ts'
+import { listen } from './socket.ts'
 
 type State = 'active' | 'inactive' | 'activating' | 'deactivating' | 'failed'
 
@@ -232,13 +232,12 @@ const handlers: Handlers = {
     return sshState()
   },
   // Server folders are measured for real under the dev data folder; the rest is pretend.
-  'disk.usage': async (p, ctx) => {
-    const real = await disk.usage({ servers: p.servers, system: false }, ctx)
-    if (!p.system) return real
-    const shared = await disk.usage({ servers: [], system: true }, ctx)
+  'disk.usage': async (p) => {
+    const servers = await serverUsage(root, p.servers)
+    if (!p.system) return { servers, shared: null, system: null }
     return {
-      servers: real.servers,
-      shared: shared.shared,
+      servers,
+      shared: { imports: 0, archive: 0, unreadable: 0 },
       system: { ...fakeSystem, unreadable: 0, ...fakeFree },
     }
   },
@@ -267,23 +266,11 @@ const handlers: Handlers = {
   },
 }
 
-const ctx = {
-  unitEvents,
-  paths: {
-    servers: serversDir,
-    runtimes: join(root, 'runtimes'),
-    archive: join(root, 'archive'),
-    config: join(root, 'etc'),
-    systemd: join(root, 'systemd'),
-    state: join(root, 'agent'),
-    panelData: root,
-    prefix: join(root, 'prefix'),
-    system: join(root, 'system'),
-  },
+const ctx: AgentContext = {
   version: '0.0.0-dev-fake',
-  log: (e: unknown) => console.log(JSON.stringify(e)),
-} as unknown as AgentContext
+  log: (e) => console.log(JSON.stringify(e)),
+}
 
 await mkdir(root, { recursive: true })
-await listen({ socketPath, group: null }, handlers, ctx)
+listen(socketPath, handlers, ctx)
 console.log(`fake agent listening on ${socketPath}`)

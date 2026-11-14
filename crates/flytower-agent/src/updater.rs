@@ -1,5 +1,4 @@
-//! Switching Flytower to another installed release, and back again if it isn't healthy, like
-//! `packages/agent/src/updater.ts`. Runs as its own transient systemd unit (started by
+//! Switching Flytower to another installed release, and back again if it isn't healthy. Runs as its own transient systemd unit (started by
 //! `update.install` and `update.rollback`), because it restarts the agent that started it.
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -119,7 +118,7 @@ pub fn current_version(prefix: &Path) -> std::io::Result<String> {
         .to_string())
 }
 
-/// Replaces the first line starting with `start` (as the TypeScript `/^start.*$/m` does).
+/// Replaces the first line starting with `start` (the first match of `/^start.*$/m`).
 fn replace_line(text: &str, start: &str, line: &str) -> String {
     let mut done = false;
     text.split_inclusive('\n')

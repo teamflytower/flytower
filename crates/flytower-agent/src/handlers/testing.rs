@@ -1,4 +1,5 @@
-//! Test helpers shared by the handler tests, like `packages/agent/test/fakes.ts`.
+//! Test helpers shared by the handler tests: a temporary box, and fakes for commands and
+//! downloads.
 #![allow(
     clippy::must_use_candidate,
     clippy::missing_panics_doc,

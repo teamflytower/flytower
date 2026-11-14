@@ -1,4 +1,4 @@
-//! SSH in the firewall, like `packages/agent/src/handlers/ssh.ts`: closed for good once the
+//! SSH in the firewall: closed for good once the
 //! panel works, opened briefly in an emergency. The timer that closes it lives here, in the
 //! agent, and survives restarts through a small state file.
 
@@ -244,7 +244,7 @@ pub fn set(open: bool, minutes: Option<i64>, ctx: &Context) -> Result<Value, Age
 /// If closing fails.
 pub fn restore(ctx: &Context) -> Result<(), AgentError> {
     let Some(text) = closes_at(&ctx.paths.state) else {
-        // No state file, or one that isn't JSON: nothing to restore, as in the TypeScript agent.
+        // No state file, or one that isn't JSON: nothing to restore.
         return Ok(());
     };
     let now: SystemTime = (ctx.now)();

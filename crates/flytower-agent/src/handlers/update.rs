@@ -1,4 +1,4 @@
-//! Updating Flytower, like `packages/agent/src/handlers/update.ts`: fetch a signed release,
+//! Updating Flytower: fetch a signed release,
 //! check it, unpack it beside the others, and hand over to its updater, which switches
 //! `current` and rolls back if the new version isn't healthy.
 

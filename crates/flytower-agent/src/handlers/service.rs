@@ -1,6 +1,5 @@
-//! Server services through systemd, like `packages/agent/src/handlers/service.ts`. For now this
-//! calls `systemctl`, exactly as the TypeScript agent does; talking to systemd over D-Bus comes
-//! later, behind the same functions.
+//! Server services through systemd. For now this calls `systemctl`; talking to systemd over
+//! D-Bus may come later (#235), behind the same functions.
 
 use std::collections::BTreeMap;
 

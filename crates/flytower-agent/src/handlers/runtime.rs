@@ -1,4 +1,4 @@
-//! Installing Java, like `packages/agent/src/handlers/runtime.ts`: Eclipse Temurin from the
+//! Installing Java: Eclipse Temurin from the
 //! Adoptium API (not apt), checked against the SHA-256 it publishes, unpacked into a staging
 //! folder and renamed into place, so a half-finished install is never visible.
 

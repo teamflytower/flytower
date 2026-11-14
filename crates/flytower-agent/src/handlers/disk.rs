@@ -1,5 +1,5 @@
-//! Disk use, measured as root so nothing is out of reach, and three fixed ways to free some,
-//! like `packages/agent/src/handlers/disk.ts`. Every place measured is built from the agent's
+//! Disk use, measured as root so nothing is out of reach, and three fixed ways to free some.
+//! Every place measured is built from the agent's
 //! own paths and a fixed list; the panel only names servers.
 
 use std::collections::{BTreeMap, HashSet};
@@ -480,7 +480,7 @@ mod tests {
         fs::write(path, vec![1u8; bytes]).unwrap();
     }
 
-    /// The same machine as the TypeScript agent's disk tests.
+    /// A made-up box with something in every place measured.
     fn machine(label: &str) -> TempRoot {
         let root = TempRoot::new(label);
         let p = &root.paths;

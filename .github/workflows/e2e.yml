@@ -211,10 +211,10 @@ jobs:
             exit 1
           }
 
-      - name: Rust agent by default, falling back to Bun if it won't start
+      - name: The Rust agent, and nothing else
         run: |
           kind() { bash tests/e2e/agent-kind.sh; }
-          expect() { k="$(kind)"; [ "$k" = "$1" ] || { echo "expected the $1 agent, got $k: $2"; exit 1; }; echo "✓ $1: $2"; }
+          expect() { k="$(kind)"; [ "$k" = rust ] || { echo "expected the Rust agent, got $k: $1"; exit 1; }; echo "✓ rust: $1"; }
           answers() {
             for _ in $(seq 1 10); do
               docker exec vps /opt/flytower/current/bin/bun /src/tests/e2e/agent-call.ts ssh.status && return 0
@@ -222,40 +222,19 @@ jobs:
             done
             echo "the agent doesn't answer"; exit 1
           }
-          # Six restarts in a few seconds would hit systemd's start limit (5 in 10s), so clear
-          # the count first; a real box restarts the agent once when Rust fails.
           restart() { docker exec vps sh -c 'systemctl reset-failed flytower-agent; systemctl restart flytower-agent'; }
-          bin="$(docker exec vps readlink -f /opt/flytower/current/bin)"
-          marker=/run/flytower/agent-rust-starting
 
-          expect rust "a fresh install"
+          expect "a fresh install"
           answers
+          # The release carries no Bun agent to fall back to.
+          docker exec vps sh -c 'test ! -e /opt/flytower/current/agent' || { echo "a Bun agent is still in the release"; exit 1; }
 
-          # A Rust agent that exits before it listens: systemd restarts the wrapper, which sees
-          # the marker it left and starts Bun instead.
-          docker exec vps sh -c "mv '$bin/flytower-agent-rust' '$bin/flytower-agent-rust.real' &&
-            printf '#!/bin/sh\necho broken >&2\nexit 1\n' > '$bin/flytower-agent-rust' &&
-            chmod +x '$bin/flytower-agent-rust'"
-          restart
-          expect bun "the Rust agent failed to start"
-          answers
-          docker exec vps mv -f "$bin/flytower-agent-rust.real" "$bin/flytower-agent-rust"
-          restart
-          expect bun "it stays on Bun until a reboot or an update clears the marker"
-          docker exec vps rm "$marker"
-          restart
-          expect rust "the marker cleared"
-          answers
-
-          # Choosing Bun by hand.
+          # 1.4 chose Bun with `bun` in /etc/flytower/agent. That file means nothing now.
           docker exec vps sh -c 'echo bun > /etc/flytower/agent'
           restart
-          expect bun "chosen in /etc/flytower/agent"
+          expect "the old Bun switch is ignored"
           answers
           docker exec vps rm /etc/flytower/agent
-          restart
-          expect rust "back to the default"
-          answers
 
       - name: Self-update, and roll back an update that won't start
         run: |

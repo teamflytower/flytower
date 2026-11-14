@@ -1,4 +1,4 @@
-//! Keeps the Caddyfile the installer wrote up to date, like `packages/agent/src/caddy.ts`.
+//! Keeps the Caddyfile the installer wrote up to date.
 //! Since 1.2, a server's own hostname shows its public status page, which needs Caddy to get
 //! certificates on demand. Only the installer wrote that, so installs from before 1.2 that
 //! were updated from the panel never got it. The agent adds it when it starts.

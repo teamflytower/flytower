@@ -46,26 +46,7 @@ await cp(panelOutput, join(stage, 'panel'), { recursive: true, dereference: true
 const links = (await $`find ${join(stage, 'panel')} -type l`.text()).trim()
 if (links) throw new Error(`symlinks left in the panel output:\n${links}`)
 
-// Agent: one bundled file, no node_modules.
-const agent = await Bun.build({
-  entrypoints: [join(repo, 'packages/agent/src/main.ts')],
-  target: 'bun',
-  outdir: join(stage, 'agent'),
-  naming: 'agent.js',
-  minify: false,
-})
-if (!agent.success) throw new AggregateError(agent.logs, 'agent bundle failed')
-// The updater runs from the release it installs, as its own process.
-const updater = await Bun.build({
-  entrypoints: [join(repo, 'packages/agent/src/updater-main.ts')],
-  target: 'bun',
-  outdir: join(stage, 'agent'),
-  naming: 'updater.js',
-  minify: false,
-})
-if (!updater.success) throw new AggregateError(updater.logs, 'updater bundle failed')
-
-// Bun itself.
+// Bun itself, for the panel.
 const bunTarget = join(stage, 'bin/bun')
 if (values.bun) {
   await cp(values.bun, bunTarget)
@@ -92,16 +73,12 @@ await chmod(bunTarget, 0o755)
 const rustTarget = arch === 'amd64' ? 'x86_64-unknown-linux-musl' : 'aarch64-unknown-linux-musl'
 const crates = join(repo, 'crates')
 await $`cargo build --release --locked --target ${rustTarget}`.cwd(crates)
-// The Rust agent and updater go in as *-rust, behind the wrappers, which start them unless
-// Bun is chosen or the Rust agent failed to start (see packages/agent/bin/flytower-agent).
-for (const [bin, as] of [
-  ['flytower-du', 'flytower-du'],
-  ['flytower-agent', 'flytower-agent-rust'],
-  ['flytower-updater', 'flytower-updater-rust'],
-  ['flytower-map', 'flytower-map'],
-] as const) {
-  await cp(join(crates, 'target', rustTarget, 'release', bin), join(stage, 'bin', as))
-  await chmod(join(stage, 'bin', as), 0o755)
+// systemd and the agent start bin/flytower-agent and bin/flytower-updater by these paths,
+// whatever is behind them (docs/decisions/0001-rust-and-go.md). Since 1.5.0 that is the Rust
+// programs themselves: no wrapper, no Bun fallback.
+for (const bin of ['flytower-du', 'flytower-agent', 'flytower-updater', 'flytower-map']) {
+  await cp(join(crates, 'target', rustTarget, 'release', bin), join(stage, 'bin', bin))
+  await chmod(join(stage, 'bin', bin), 0o755)
 }
 
 // Go helpers (go/), cross-compiled with cgo off, so they're static for either architecture.
@@ -131,13 +108,6 @@ await cp(
   join(modDir, `build/libs/flytower-proxy-${version}.jar`),
   join(stage, 'mods/flytower-proxy.jar'),
 )
-
-// Stable entry points: systemd and the agent start these, never Bun directly, so a later
-// release can swap what's behind them (docs/decisions/0001-rust-and-go.md).
-for (const wrapper of ['flytower-agent', 'flytower-updater']) {
-  await cp(join(repo, 'packages/agent/bin', wrapper), join(stage, 'bin', wrapper))
-  await chmod(join(stage, 'bin', wrapper), 0o755)
-}
 
 await cp(join(repo, 'installer/install.sh'), join(stage, 'install.sh'))
 await chmod(join(stage, 'install.sh'), 0o755)

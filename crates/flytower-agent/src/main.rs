@@ -1,5 +1,5 @@
-//! `flytower-agent`: listens on the agent socket and answers the panel. Configured by the same
-//! environment variables as the TypeScript agent.
+//! `flytower-agent`: listens on the agent socket and answers the panel. Configured by environment
+//! variables, which the installer's systemd unit sets.
 
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -17,21 +17,6 @@ use flytower_agent::{caddy, folders};
 
 fn env(name: &str, fallback: &str) -> String {
     std::env::var(name).unwrap_or_else(|_| fallback.to_string())
-}
-
-/// bin/flytower-agent writes this beside the socket before starting the Rust agent. If it's
-/// still there on the next start, that start failed, and the wrapper falls back to Bun.
-fn clear_start_marker(socket: &Path) {
-    let marker = socket
-        .parent()
-        .unwrap_or_else(|| Path::new("/"))
-        .join("agent-rust-starting");
-    match std::fs::remove_file(&marker) {
-        Err(e) if e.kind() != std::io::ErrorKind::NotFound => {
-            eprintln!("flytower-agent: can't remove {}: {e}", marker.display());
-        }
-        _ => {}
-    }
 }
 
 fn main() -> ExitCode {
@@ -116,11 +101,6 @@ fn main() -> ExitCode {
         Ok(false) => {}
         Err(e) => eprintln!("updating the Caddyfile failed: {e}"),
     }
-    // Tell bin/flytower-agent this start worked, so it keeps choosing Rust after a restart.
-    // Only now, after the start-up steps above: if one of them brings the agent down, the
-    // marker stays and the next start uses Bun. (The steps log their own errors and carry on,
-    // so only a crash keeps the marker.)
-    clear_start_marker(&opts.socket_path);
     // stdout goes to the journal; one JSON line per request and per subscription's end.
     let agent = Agent {
         ctx: Arc::new(ctx),

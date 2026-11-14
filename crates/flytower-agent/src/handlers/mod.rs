@@ -1,4 +1,4 @@
-//! What each verb does, one module per area, matching `packages/agent/src/handlers`. Every
+//! What each verb does, one module per area. Every
 //! verb in the protocol is handled here.
 
 pub mod disk;
@@ -39,8 +39,7 @@ pub fn system_clock() -> Clock {
     Arc::new(SystemTime::now)
 }
 
-/// Everything a handler may touch, from the same environment variables as the TypeScript
-/// agent. Tests swap `exec` for a fake.
+/// Everything a handler may touch, from environment variables. Tests swap `exec` for a fake.
 pub struct Context {
     pub version: String,
     pub exec: Arc<dyn Exec>,

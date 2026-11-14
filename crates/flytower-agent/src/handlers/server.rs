@@ -1,5 +1,4 @@
-//! Creating, changing and removing the OS side of a server, like
-//! `packages/agent/src/handlers/server.ts`.
+//! Creating, changing and removing the OS side of a server.
 
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
@@ -238,7 +237,7 @@ pub fn configure(
         let env = read(&f.env).unwrap_or_default();
         let java = match java_major {
             Some(major) => Some(str(&java_home(ctx, major)?).to_string()),
-            // Like Bun, an empty `JAVA_HOME=` counts as none.
+            // An empty `JAVA_HOME=` counts as none.
             None => env_value(&env, "JAVA_HOME")
                 .filter(|v| !v.is_empty())
                 .map(str::to_string),

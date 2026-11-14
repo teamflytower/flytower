@@ -3,27 +3,33 @@ import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'bun:test'
+import { AgentError } from '@flytower/protocol'
 import { callAgent } from '@flytower/protocol/client'
-import { handlers } from '../src/index.ts'
-import { listen } from '../src/server.ts'
-import { fakeContext, fakeExec } from './fakes.ts'
+import { protocolInfo, type Handlers } from '../src/dispatch.ts'
+import { listen } from '../src/socket.ts'
 
 const closers: (() => void)[] = []
 afterEach(() => closers.splice(0).forEach((c) => c()))
 
 const sock = () => join(mkdtempSync(join(tmpdir(), 'flytower-cl-')), 'agent.sock')
 
-async function agentAt(exec = fakeExec().exec) {
+/** The stand-in's socket and dispatch, with just enough verbs to talk to. */
+function agentAt() {
   const socketPath = sock()
-  const { ctx } = fakeContext(exec)
-  const server = await listen({ socketPath, group: null }, handlers, ctx)
+  const handlers = {
+    ping: async (_p, ctx) => protocolInfo(ctx.version),
+    'service.start': async ({ server }) => {
+      throw new AgentError('not_found', `no server ${server}`)
+    },
+  } as Partial<Handlers> as Handlers
+  const server = listen(socketPath, handlers, { version: '0.0.0-test', log: () => {} })
   closers.push(() => server.close())
   return socketPath
 }
 
-describe('callAgent', () => {
+describe('callAgent against the stand-in', () => {
   it('returns a typed result', async () => {
-    const socketPath = await agentAt()
+    const socketPath = agentAt()
     expect(await callAgent('ping', {}, { socketPath })).toEqual({
       agentVersion: '0.0.0-test',
       protocol: 1,
@@ -31,7 +37,7 @@ describe('callAgent', () => {
   })
 
   it("throws the agent's error code", async () => {
-    const socketPath = await agentAt(fakeExec({ 'systemctl show': { stdout: 'not-found' } }).exec)
+    const socketPath = agentAt()
     const err = await callAgent('service.start', { server: 'ghost' }, { socketPath }).catch(
       (e) => e,
     )

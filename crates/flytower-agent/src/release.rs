@@ -1,4 +1,4 @@
-//! Checking Flytower releases, like `packages/agent/src/release.ts`. The key is the one the
+//! Checking Flytower releases. The key is the one the
 //! installer embeds, built in at compile time. Only SHA256SUMS is signed: it covers every
 //! archive.
 

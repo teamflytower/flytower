@@ -1,4 +1,4 @@
-//! Turns one request line into one response, like `packages/agent/src/dispatch.ts`. Never
+//! Turns one request line into one response. Never
 //! panics on input: every failure becomes an error response, and every request is written to
 //! the audit log.
 
@@ -10,7 +10,7 @@ use crate::envelope::{AgentError, End, ErrorCode, Request, Response, Subscribe};
 use crate::stream::Stream;
 use crate::verbs::{Params, SubParams, check_result, check_sub_result};
 
-/// One audit log entry, as the JSON line the TypeScript agent writes.
+/// One audit log entry, written to the journal as a JSON line.
 #[must_use]
 pub fn audit_line(at: SystemTime, id: &str, verb: &str, res: &Response, ms: u128) -> String {
     let mut entry = json!({

@@ -1,11 +1,9 @@
 /**
- * Following systemd instead of asking it over and over. systemd (PID 1) writes a journal line
- * for every change to a unit: started, main process exited, failed, restart scheduled,
- * stopped. `journalctl --follow` hands those over as they are written, and `service.wait`
- * holds a request open until one concerns a server the panel cares about.
+ * `service.wait` for the stand-in agent: it holds a request open until a server the panel
+ * cares about changes. The fake writes a journal-style line per change, as systemd would, so
+ * the panel sees the same cursors and bursts as on a real box. The real agent does this in
+ * Rust (`crates/flytower-agent/src/events.rs`).
  */
-import type { Subprocess } from 'bun'
-
 const UNIT = /^flytower-mc@([a-z][a-z0-9-]{0,30})\.service$/
 
 /** The server a journal line (journalctl -o json) is about, if it's one of ours. */
@@ -23,28 +21,6 @@ export function serverOfLine(line: string): string | null {
 export type Follow = (onLine: (line: string) => void) => {
   stop: () => void
   exited: Promise<unknown>
-}
-
-/** journalctl, following PID 1's messages from now on. */
-export const followJournal: Follow = (onLine) => {
-  const proc: Subprocess<'ignore', 'pipe', 'ignore'> = Bun.spawn(
-    ['journalctl', '--follow', '--output=json', '--lines=0', '_PID=1'],
-    { stdin: 'ignore', stdout: 'pipe', stderr: 'ignore' },
-  )
-  void (async () => {
-    const decoder = new TextDecoder()
-    let buf = ''
-    for await (const chunk of proc.stdout) {
-      buf += decoder.decode(chunk, { stream: true })
-      let nl: number
-      while ((nl = buf.indexOf('\n')) >= 0) {
-        onLine(buf.slice(0, nl))
-        buf = buf.slice(nl + 1)
-      }
-      if (buf.length > 1 << 20) buf = ''
-    }
-  })().catch(() => {})
-  return { stop: () => proc.kill(), exited: proc.exited }
 }
 
 export interface WaitResult {
@@ -70,7 +46,7 @@ export class UnitEvents {
   following = false
 
   constructor(
-    private follow: Follow = followJournal,
+    private follow: Follow,
     private retryMs = 5000,
   ) {}
 

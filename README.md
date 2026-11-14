@@ -51,11 +51,11 @@ bun run lint
 bun run typecheck
 ```
 
-To work on the panel without root or systemd, run the fake agent next to the dev server. It simulates services, logs and RCON:
+To work on the panel without root or systemd, run the stand-in agent next to the dev server. It's a small TypeScript fake that simulates services, logs and RCON; real boxes run the Rust agent in `crates/flytower-agent`:
 
 ```sh
-bun run --filter @flytower/agent dev   # terminal 1
-bun run --filter @flytower/panel dev   # terminal 2, then open http://localhost:3000 (setup token: dev-setup-token)
+bun run --filter @flytower/dev-agent dev   # terminal 1
+bun run --filter @flytower/panel dev       # terminal 2, then open http://localhost:3000 (setup token: dev-setup-token)
 ```
 
 The agent, updater and other root helpers are in Rust (`crates/`), and the networking helpers, starting with the hostname router, are in Go (`go/`). The `flytower-proxy` Fabric mod (`mods/`) is Java, built with its Gradle wrapper and Java 25. You only need those toolchains to work on them; the versions are pinned in `crates/rust-toolchain.toml`, `go/go.mod` and `mods/flytower-proxy/gradle.properties`. [Decision record 0001](docs/decisions/0001-rust-and-go.md#building) says how to build and check each.
@@ -67,7 +67,8 @@ Commit and pull request titles use Conventional Commits (`feat:`, `fix:`, `docs:
 | Path                 | What                                                                                          |
 | -------------------- | --------------------------------------------------------------------------------------------- |
 | `apps/panel`         | Nuxt web app (UI and API), runs unprivileged                                                  |
-| `packages/agent`     | Root helper that performs a fixed list of operations over a Unix socket                       |
+| `crates/`            | Rust: the root helper (agent and updater), disk measuring and the web map renderer            |
+| `packages/dev-agent` | Stand-in agent for working on the panel without root (never shipped)                          |
 | `packages/protocol`  | Shared message schemas between the panel and the agent                                        |
 | `packages/providers` | Where servers and content come from (Mojang, Fabric, Paper, Modrinth, Hangar, Vanilla Tweaks) |
 | `packages/rcon`      | Minecraft RCON client                                                                         |

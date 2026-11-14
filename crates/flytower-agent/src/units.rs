@@ -1,10 +1,10 @@
-//! systemd units and the files beside them, matching `packages/agent/src/units.ts` byte for
-//! byte: both agents rewrite the template when it differs, so any drift would make them fight.
-//! `protocol/fixtures/server-unit.service` pins the text; both test suites check it.
+//! systemd units and the files beside them. The agent rewrites the template whenever it
+//! differs, and so did the releases before this one, so the text must not drift by accident.
+//! `protocol/fixtures/server-unit.service` pins it, and the tests check it.
 
 use std::path::Path;
 
-/// Where the agent keeps things, from the same environment variables as the TypeScript agent.
+/// Where the agent keeps things, from environment variables, with the installer's defaults.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Paths {
     pub servers: String,

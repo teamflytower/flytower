@@ -39,7 +39,7 @@ From 1.2 to 1.4 there was a **Native** channel, with test builds of Flytower's R
 
 A box that was on the Native channel is offered the releases of the channel its version belongs to: Stable for `1.4.3-native.1`, Beta for `1.4.0-beta.2.native.1`. **System, Updates** says so until you choose a channel.
 
-From 1.4.0, the system helper and the updater are the Rust versions on every channel (1.3 carried them switched off). The Bun versions are still in each release: if the Rust helper fails to start, Flytower starts the Bun one by itself and says so in `journalctl -u flytower-agent`. To use Bun on purpose, run `echo bun > /etc/flytower/agent` as root and restart `flytower-agent`. Delete that file and restart again to go back. After a fallback, the box stays on Bun until it reboots or updates; to try Rust again sooner, delete `/run/flytower/agent-rust-starting` and restart `flytower-agent`.
+From 1.5.0, the system helper and the updater are Rust only. The Bun versions, which 1.4 kept as a fallback, are gone. If an update's helper won't start, the update fails its health check and rolls back to the version you had, as any failed update does. 1.4 let you choose Bun with `/etc/flytower/agent`; 1.5.0 ignores that file, and you can delete it.
 
 ## Releases are signed
 

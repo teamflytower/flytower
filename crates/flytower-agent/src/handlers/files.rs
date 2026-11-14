@@ -1,4 +1,4 @@
-//! File helpers with the same behaviour as the `node:fs` calls the TypeScript handlers make.
+//! File helpers for the handlers: making folders, writing and copying files, as root.
 
 use std::fs::{self, DirBuilder, OpenOptions};
 use std::io::{self, Write};

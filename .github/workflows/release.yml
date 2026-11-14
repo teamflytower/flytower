@@ -124,7 +124,7 @@ jobs:
       - run: bun run lint
       - run: bun run typecheck
       - run: bun test
-      - run: shellcheck installer/*.sh packages/agent/bin/*
+      - run: shellcheck installer/*.sh
 
       - name: Build panel
         run: bun run build

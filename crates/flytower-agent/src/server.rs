@@ -1,6 +1,5 @@
-//! The Unix socket server, like `packages/agent/src/server.ts`, plus the check Bun can't do:
-//! the kernel's `SO_PEERCRED` says who connected, and only root or the panel's user may talk
-//! to the agent. The socket's file mode still guards it as before; this is a second lock. It
+//! The Unix socket server. The kernel's `SO_PEERCRED` says who connected, and only root or
+//! the panel's user may talk to the agent. The socket's file mode still guards it as before; this is a second lock. It
 //! checks the user, not the group: servers share the panel's group so they can use the files
 //! the panel puts in their folders.
 

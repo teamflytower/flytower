@@ -2,8 +2,8 @@
 //! refuses anything not listed here, so this list is the whole of the panel's root access.
 //!
 //! Params are strict: unknown keys are refused, so nothing extra reaches root. Results are
-//! checked before they're sent, like the TypeScript agent does. The shared fixtures in
-//! `protocol/fixtures` keep the two in step (see `tests/fixtures.rs`).
+//! checked before they're sent. The shared fixtures in `protocol/fixtures` keep this and the
+//! panel's Zod schemas in step (see `tests/fixtures.rs`).
 
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -592,7 +592,7 @@ pub struct PruneResult {
     pub removed: Vec<String>,
 }
 
-/// Checks a verb's result before it's sent, like the TypeScript agent does.
+/// Checks a verb's result before it's sent.
 ///
 /// # Errors
 /// A message saying what's wrong, or that the verb doesn't exist.

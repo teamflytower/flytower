@@ -67,8 +67,8 @@
         "wrangler": "4.153.0",
       },
     },
-    "packages/agent": {
-      "name": "@flytower/agent",
+    "packages/dev-agent": {
+      "name": "@flytower/dev-agent",
       "version": "0.0.0",
       "dependencies": {
         "@flytower/protocol": "workspace:*",
@@ -289,7 +289,7 @@
 
     "@floating-ui/vue": ["@floating-ui/vue@2.0.1", "", { "dependencies": { "@floating-ui/dom": "^1.8.0", "@floating-ui/utils": "^0.2.12" }, "peerDependencies": { "vue": ">=3.3.0" } }, "sha512-043dyEKD9TDSfz080YH2vobubgg+NIo/9Fw4RAl7sEMpD8Am1DNrrSTl/GpMBjyGHoD/FbJY2QLawY+HSQsEIA=="],
 
-    "@flytower/agent": ["@flytower/agent@workspace:packages/agent"],
+    "@flytower/dev-agent": ["@flytower/dev-agent@workspace:packages/dev-agent"],
 
     "@flytower/docs-layer": ["@flytower/docs-layer@workspace:packages/docs-layer"],
 

@@ -116,8 +116,8 @@ async function start(data: string) {
   const stop = () => children.forEach((c) => c.kill())
   try {
     children.push(
-      Bun.spawn(['bun', 'src/dev.ts'], {
-        cwd: join(root, 'packages/agent'),
+      Bun.spawn(['bun', 'src/main.ts'], {
+        cwd: join(root, 'packages/dev-agent'),
         env,
         stdout: quiet,
         stderr: 'inherit',

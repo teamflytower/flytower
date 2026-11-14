@@ -25,8 +25,7 @@ pub trait Exec: Send + Sync {
     }
 }
 
-/// The real thing. A program still running after two minutes is killed, like the TypeScript
-/// agent's `realExec`.
+/// The real thing. A program still running after two minutes is killed.
 pub struct RealExec {
     pub timeout: Duration,
 }
@@ -61,7 +60,7 @@ impl Exec for RealExec {
             .spawn();
         let mut child = match child {
             Ok(c) => c,
-            // Like Bun.spawn throwing when the program doesn't exist.
+            // The program doesn't exist.
             Err(e) => {
                 return ExecResult {
                     code: 127,

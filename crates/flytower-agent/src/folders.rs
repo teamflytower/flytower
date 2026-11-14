@@ -1,4 +1,4 @@
-//! The agent's own folders, like `packages/agent/src/folders.ts`: outside the panel's data
+//! The agent's own folders: outside the panel's data
 //! folder so the panel's user can't swap anything in them. The state folder is root only,
 //! and the archive of deleted servers is root's, readable by the panel's group. Releases
 //! before these kept both inside the panel's folder; what they left there is moved across once.

@@ -1,8 +1,8 @@
-//! Stable entry points, like `packages/agent/src/entry-points.ts` (see
-//! `docs/decisions/0001-rust-and-go.md`, rule 5). systemd starts the agent as
+//! Stable entry points (see `docs/decisions/0001-rust-and-go.md`, rule 5). systemd starts the agent as
 //! `current/bin/flytower-agent`, and the agent starts a release's updater as
 //! `releases/<version>/bin/flytower-updater`, so what is behind those paths can change between
-//! releases. Releases from before the wrappers only have `bin/bun agent/agent.js`.
+//! releases. Releases from before these paths only have `bin/bun agent/agent.js`, and the agent still
+//! starts those that way, so it can go back to one.
 
 use std::path::{Path, PathBuf};
 
@@ -33,7 +33,8 @@ pub fn agent_exec_start(prefix: &Path, release: &Path) -> String {
     }
 }
 
-/// How to run `release`'s updater: its wrapper, or Bun and the bundled script before that.
+/// How to run `release`'s updater: `bin/flytower-updater`, or Bun and the bundled script
+/// in releases from before it.
 #[must_use]
 pub fn updater_command(release: &Path) -> Vec<PathBuf> {
     if has_wrappers(release) {
@@ -64,7 +65,7 @@ pub fn set_agent_exec_start(
         return Ok(false);
     };
     let line = agent_exec_start(prefix, release);
-    // Only the first ExecStart line, as the TypeScript regex (multiline, no `g`) does.
+    // Only the first ExecStart line.
     let mut replaced = false;
     let next: String = unit
         .split_inclusive('\n')

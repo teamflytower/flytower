@@ -340,8 +340,8 @@ umask 022
 
 # ---------------------------------------------------------------- systemd
 
-# Newer releases start the agent through a stable wrapper (bin/flytower-agent), so a
-# later release can swap what's behind it. Older releases only have Bun and agent.js.
+# Newer releases start the agent by a stable path (bin/flytower-agent), so a later release
+# can swap what's behind it. Older releases only have Bun and agent.js.
 if [[ -x "$PREFIX/current/bin/flytower-agent" ]]; then
   agent_exec="ExecStart=$PREFIX/current/bin/flytower-agent"
 else

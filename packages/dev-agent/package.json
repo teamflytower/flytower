@@ -1,15 +1,12 @@
 {
-  "name": "@flytower/agent",
+  "name": "@flytower/dev-agent",
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Privileged helper for the flytower panel. Runs as root and performs a fixed set of operations.",
-  "exports": {
-    ".": "./src/index.ts"
-  },
+  "description": "A stand-in for the Flytower agent, for working on the panel without root. Never shipped.",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "dev": "bun --watch src/dev.ts"
+    "dev": "bun --watch src/main.ts"
   },
   "dependencies": {
     "@flytower/protocol": "workspace:*"

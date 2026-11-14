@@ -21,4 +21,4 @@ jobs:
       - run: bun run typecheck
       - run: bun test
       - name: shellcheck
-        run: shellcheck --version && shellcheck installer/*.sh packages/agent/bin/*
+        run: shellcheck --version && shellcheck installer/*.sh

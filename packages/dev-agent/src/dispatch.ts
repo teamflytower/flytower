@@ -8,7 +8,21 @@ import {
   type Result,
   type Verb,
 } from '@flytower/protocol'
-import type { AgentContext } from './context.ts'
+
+/** What every handler is given: the version to report and where to log each request. */
+export interface AgentContext {
+  version: string
+  log: (event: AuditEvent) => void
+}
+
+export interface AuditEvent {
+  at: string
+  id: string
+  verb: string
+  outcome: 'ok' | 'error'
+  code?: string
+  ms: number
+}
 
 export type Handler<V extends Verb> = (params: Params<V>, ctx: AgentContext) => Promise<Result<V>>
 export type Handlers = { [V in Verb]: Handler<V> }
@@ -16,7 +30,8 @@ export type Handlers = { [V in Verb]: Handler<V> }
 const isVerb = (v: string): v is Verb => Object.hasOwn(verbs, v)
 
 /**
- * Turns one request line into one response. Never throws: every failure becomes an error
+ * Turns one request line into one response, checking params and results against the shared
+ * protocol, so the panel gets the same errors from the stand-in as from the real agent. Never throws: every failure becomes an error
  * response, and every request is written to the audit log.
  */
 export async function dispatch(

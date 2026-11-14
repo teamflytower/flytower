@@ -1,4 +1,4 @@
-//! Files the agent writes as root, like `packages/agent/src/safe-fs.ts`. Its own folders must
+//! Files the agent writes as root. Its own folders must
 //! be ones only it can change, and nothing here follows a symlink, so a path someone else
 //! planted can't redirect a write or a copy.
 

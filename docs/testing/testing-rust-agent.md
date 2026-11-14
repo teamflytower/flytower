@@ -1,6 +1,6 @@
 # Testing the Rust agent
 
-The agent is the small helper that runs as root and does the jobs the panel can't: starting and stopping servers, creating their users and folders, the firewall, Java and updates. From 1.4.0 the Rust version is the **default**, and the Bun one stays in each release as a fallback for at least one more release. They speak the same protocol, so the panel can't tell which is running.
+The agent is the small helper that runs as root and does the jobs the panel can't: starting and stopping servers, creating their users and folders, the firewall, Java and updates. From 1.5.0 it is the Rust agent and nothing else: the Bun agent, the fallback to it and the `/etc/flytower/agent` switch are gone. The way back from a bad release is the previous release, which the updater rolls back to by itself.
 
 ## Which one is running
 
@@ -10,38 +10,12 @@ On the VPS, as root:
 journalctl -u flytower-agent -n 5
 ```
 
-The Rust agent says `flytower-agent <version> (rust) listening`. The Bun one says `flytower-agent <version> listening`.
-
-## Choosing Bun
-
-To use the Bun agent instead, as root:
-
-```sh
-echo bun > /etc/flytower/agent
-systemctl restart flytower-agent
-```
-
-Delete the file and restart to go back to Rust. The choice survives updates, and it covers the updater too: with Bun chosen, updates and **Go back to** are run by the Bun updater. `echo rust` from earlier releases still means Rust. A release without the Rust versions uses the Bun ones whatever the file says.
-
-## If the Rust agent won't start
-
-Before starting the Rust agent, `bin/flytower-agent` leaves a marker at `/run/flytower/agent-rust-starting`, and the Rust agent deletes it once it has started up: it is listening and has run its start-up steps (folders, the SSH timer, the server and agent units, the Caddyfile). If the Rust agent stops before that, systemd restarts the agent two seconds later, the marker is still there, and Bun starts instead. The journal says:
-
-```
-flytower-agent: the Rust agent didn't start last time, so using the Bun agent. ...
-```
-
-This is on purpose about starting up only. Once the marker is gone, a crash later on (say while handling a request) doesn't switch to Bun: systemd just restarts the Rust agent. A start-up step that merely fails is logged and the agent carries on, so only a crash keeps the marker. If you ever see the Rust agent restarting over and over, put `bun` in `/etc/flytower/agent` and restart `flytower-agent`, then tell us.
-
-While that marker is there, the updater uses Bun too. It stays on Bun until the next reboot (the marker lives in `/run`) or the next update (the marker names the release it was for). To try Rust again straight away, `rm /run/flytower/agent-rust-starting` and restart `flytower-agent`.
-
-This only covers a failed start. A Rust agent that crashes after it's listening is restarted as Rust, like the Bun one always has been.
+It says `flytower-agent <version> (rust) listening`. `readlink -f /proc/$(systemctl show -p MainPID --value flytower-agent)/exe` ends in `bin/flytower-agent`.
 
 ## Checks
 
-With the Rust agent (the default):
-
-- [ ] After installing or updating, the journal shows the Rust agent listening, with no `/etc/flytower/agent` file.
+- [ ] After installing or updating, the journal shows the Rust agent listening, and `/opt/flytower/current` has no `agent` folder.
+- [ ] A box from 1.4 that had `bun` in `/etc/flytower/agent` runs the Rust agent after updating. The file is ignored.
 - [ ] **System**: the agent shows as connected, with the same version as the panel.
 - [ ] **Start**, **Stop** and **Restart** a server. The status changes straight away, with no refresh.
 - [ ] Stop the server from SSH (`systemctl stop flytower-mc@<name>`). The panel notices within a few seconds.
@@ -49,16 +23,14 @@ With the Rust agent (the default):
 - [ ] Change a server's memory and port in **Settings**, then restart it. Both take effect.
 - [ ] **System**, **SSH**: open SSH for 5 minutes, check you can connect, then let it close by itself. Restart the agent while it's open and check it still closes on time.
 - [ ] Delete a test server. Its folder is archived under `/var/lib/flytower-archive`.
-- [ ] **System**, **Updates**: update to a newer build, then use **Go back to**. Both work, the agent stays on Rust afterwards, and `journalctl -u 'flytower-update-*'` shows the updater's result as one JSON line.
-- [ ] Fallback: `cp /opt/flytower/current/bin/flytower-agent-rust /root/` then `echo 'exit 1' > /opt/flytower/current/bin/flytower-agent-rust` and restart `flytower-agent`. Within a few seconds the journal shows the fallback message and the Bun agent listening, and the panel still works. Put the binary back (`cp /root/flytower-agent-rust /opt/flytower/current/bin/`), delete the marker, restart, and it's Rust again.
-- [ ] Choose Bun as above, and check everything still works with nothing left over.
+- [ ] **System**, **Updates**: update to a newer build, then use **Go back to** a 1.4 release and forward again. Each works, and `journalctl -u 'flytower-update-*'` shows the updater's result as one JSON line.
 
-From 1.5.0 the Rust agent also speaks protocol 2 (subscriptions, see `protocol/README.md`), and both agents answer `agent.hello`. To ask, as root:
+From 1.5.0 the Rust agent also speaks protocol 2 (subscriptions, see `protocol/README.md`), and answers `agent.hello`. To ask, as root:
 
 ```sh
 printf '{"id":"1","verb":"agent.hello","params":{}}\n' | nc -U -q1 /run/flytower/agent.sock
 ```
 
-- [ ] With Rust, the answer has `"kind":"rust"` and `"protocols":[1,2]`. With Bun chosen, `"kind":"bun"` and `"protocols":[1]`.
+- [ ] The answer has `"kind":"rust"` and `"protocols":[1,2]`.
 
-If anything goes wrong, choose Bun and send `journalctl -u flytower-agent -n 100`.
+If anything goes wrong, send `journalctl -u flytower-agent -n 100`.
