@@ -83,3 +83,33 @@ export function diskLevel(percent: number | null): DiskLevel {
   if (percent >= DISK_WARN) return 'warning'
   return 'ok'
 }
+
+/** Worlds smaller than this aren't worth suggesting a trim for. */
+export const TRIM_SUGGEST_BYTES = 512 * 1024 ** 2
+
+/**
+ * The server whose world is the biggest single thing on the disk, if a world is: bigger than
+ * any server's backups, exports or other parts, the waiting imports and archives, and each
+ * measured part of the rest of the machine. The Storage page suggests trimming it.
+ */
+export function biggestWorld(report: DiskReport): { server: string; bytes: number } | null {
+  let top: { server: string | null; bytes: number } = { server: null, bytes: 0 }
+  const consider = (server: string | null, bytes: number) => {
+    if (bytes > top.bytes) top = { server, bytes }
+  }
+  for (const s of report.servers) {
+    for (const [group, bytes] of Object.entries(s.groups) as [DiskGroup, number][]) {
+      consider(group === 'world' ? s.server : null, bytes)
+    }
+  }
+  consider(null, report.shared?.imports ?? 0)
+  consider(null, report.shared?.archive ?? 0)
+  if (report.system) {
+    for (const part of Object.keys(SYSTEM_PARTS) as SystemPart[]) {
+      consider(null, report.system[part])
+    }
+  }
+  return top.server !== null && top.bytes >= TRIM_SUGGEST_BYTES
+    ? { server: top.server, bytes: top.bytes }
+    : null
+}

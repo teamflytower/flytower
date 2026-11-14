@@ -23,7 +23,7 @@ import {
   measureServer,
   measureWithBinary,
 } from '../server/disk'
-import { diskLevel, type DiskReport } from '../shared/disk'
+import { biggestWorld, diskLevel, type DiskReport } from '../shared/disk'
 
 const KB = 1024
 
@@ -316,5 +316,60 @@ describe('levels', () => {
     expect(diskLevel(84.9)).toBe('ok')
     expect(diskLevel(85)).toBe('warning')
     expect(diskLevel(95)).toBe('urgent')
+  })
+})
+
+describe('suggesting a trim', () => {
+  const GB = 1024 ** 3
+  const groups = (world: number, backups = 0) => ({
+    world,
+    backups,
+    exports: 0,
+    logs: 0,
+    content: 0,
+    map: 0,
+    other: 0,
+  })
+  const report = (over: Partial<DiskReport> = {}): DiskReport => ({
+    servers: [
+      { server: 'survival', bytes: 0, groups: groups(3 * GB, GB), unreadable: 0, measuredAt: '' },
+      { server: 'creative', bytes: 0, groups: groups(GB), unreadable: 0, measuredAt: '' },
+    ],
+    shared: { imports: 0, archive: 0, unreadable: 0 },
+    system: null,
+    measuredAt: null,
+    ...over,
+  })
+
+  it('names the server whose world is the biggest thing on the disk', () => {
+    expect(biggestWorld(report())).toEqual({ server: 'survival', bytes: 3 * GB })
+  })
+
+  it('says nothing when something else is bigger, or the world is small', () => {
+    const backups = report()
+    backups.servers[1]!.groups.backups = 4 * GB
+    expect(biggestWorld(backups)).toBeNull()
+    expect(
+      biggestWorld(report({ shared: { imports: 0, archive: 5 * GB, unreadable: 0 } })),
+    ).toBeNull()
+    expect(
+      biggestWorld(
+        report({
+          system: {
+            java: 4 * GB,
+            flytower: 0,
+            logs: 0,
+            temp: 0,
+            unreadable: 0,
+            journal: 0,
+            aptCache: 0,
+            oldReleases: 0,
+          },
+        }),
+      ),
+    ).toBeNull()
+    const small = report()
+    small.servers = [{ ...small.servers[0]!, groups: groups(100 * 1024 ** 2) }]
+    expect(biggestWorld(small)).toBeNull()
   })
 })
