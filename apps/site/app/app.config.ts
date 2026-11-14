@@ -11,7 +11,7 @@ export default defineAppConfig({
     kofi: '', // set once the Ko-fi page exists
     discord: '', // set once the Discord server exists
     install:
-      'curl -fsSL https://github.com/teamflytower/flytower/releases/latest/download/install.sh | sudo bash -s -- --domain panel.example.com',
+      'curl -fsSL https://flytower.dev/install.sh | sudo bash -s -- --domain panel.example.com',
   },
   /** Docs are served at /docs; the sidebar groups pages by their `section` frontmatter. */
   docs: { base: '/docs' },
