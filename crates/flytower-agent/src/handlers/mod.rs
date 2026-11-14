@@ -3,6 +3,7 @@
 
 pub mod disk;
 pub(crate) mod files;
+pub mod router;
 pub mod runtime;
 pub mod server;
 pub mod service;
@@ -96,6 +97,9 @@ pub fn handle(params: &Params, ctx: &Context) -> Result<Value, AgentError> {
         Params::DiskVacuumJournal(p) => disk::vacuum_journal(p.max_mb, ctx),
         Params::DiskCleanApt => disk::clean_apt(ctx),
         Params::DiskPruneFlytower => disk::prune_flytower(ctx),
+        Params::ServerExpose(p) => server::expose(&p.name, p.port, p.public, ctx),
+        Params::RouterEnable(p) => router::enable(p.port, ctx),
+        Params::RouterDisable => router::disable(ctx),
     }
 }
 

@@ -451,6 +451,39 @@
         "additionalProperties": false
       }
     },
+    "router.disable": {
+      "params": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "result": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    "router.enable": {
+      "params": {
+        "type": "object",
+        "properties": {
+          "port": {
+            "type": "integer",
+            "minimum": 1024,
+            "maximum": 65535
+          }
+        },
+        "required": [
+          "port"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
     "runtime.install": {
       "params": {
         "type": "object",
@@ -607,6 +640,36 @@
         "required": [
           "archivedTo"
         ],
+        "additionalProperties": false
+      }
+    },
+    "server.expose": {
+      "params": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{1,30}$"
+          },
+          "port": {
+            "type": "integer",
+            "minimum": 1024,
+            "maximum": 65535
+          },
+          "public": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "port",
+          "public"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "type": "object",
+        "properties": {},
         "additionalProperties": false
       }
     },
@@ -1114,6 +1177,244 @@
           "current",
           "releases",
           "last"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "routerVerbs": {
+    "ping": {
+      "params": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "result": {
+        "type": "object",
+        "properties": {
+          "routerVersion": {
+            "type": "string"
+          },
+          "protocol": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "routerVersion",
+          "protocol"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "routes.set": {
+      "params": {
+        "type": "object",
+        "properties": {
+          "routes": {
+            "maxItems": 256,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]{1,30}$"
+                },
+                "hostnames": {
+                  "minItems": 1,
+                  "maxItems": 16,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "maxLength": 253,
+                    "pattern": "^(\\*\\.)?([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\\.)*[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$"
+                  }
+                },
+                "port": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 65535
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "running",
+                    "starting",
+                    "stopped"
+                  ]
+                },
+                "proxyProtocol": {
+                  "type": "boolean"
+                },
+                "bans": {
+                  "maxItems": 10000,
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "ipv4",
+                        "pattern": "^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])$"
+                      },
+                      {
+                        "type": "string",
+                        "format": "ipv6",
+                        "pattern": "^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:))$"
+                      },
+                      {
+                        "type": "string",
+                        "format": "cidrv4",
+                        "pattern": "^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\/([0-9]|[1-2][0-9]|3[0-2])$"
+                      },
+                      {
+                        "type": "string",
+                        "format": "cidrv6",
+                        "pattern": "^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:))\\/(12[0-8]|1[01][0-9]|[1-9]?[0-9])$"
+                      }
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "name",
+                "hostnames",
+                "port",
+                "state",
+                "proxyProtocol",
+                "bans"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "messages": {
+            "type": "object",
+            "properties": {
+              "unknownMotd": {
+                "type": "string",
+                "maxLength": 512
+              },
+              "unknownDisconnect": {
+                "type": "string",
+                "maxLength": 512
+              },
+              "stoppedMotd": {
+                "type": "string",
+                "maxLength": 512
+              },
+              "stoppedDisconnect": {
+                "type": "string",
+                "maxLength": 512
+              },
+              "startingMotd": {
+                "type": "string",
+                "maxLength": 512
+              },
+              "startingDisconnect": {
+                "type": "string",
+                "maxLength": 512
+              },
+              "bannedDisconnect": {
+                "type": "string",
+                "maxLength": 512
+              }
+            },
+            "required": [
+              "unknownMotd",
+              "unknownDisconnect",
+              "stoppedMotd",
+              "stoppedDisconnect",
+              "startingMotd",
+              "startingDisconnect",
+              "bannedDisconnect"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "routes",
+          "messages"
+        ],
+        "additionalProperties": false
+      },
+      "result": {
+        "type": "object",
+        "properties": {
+          "routes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "routes"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "routes.status": {
+      "params": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "result": {
+        "type": "object",
+        "properties": {
+          "since": {
+            "type": "string"
+          },
+          "routes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]{1,30}$"
+                },
+                "active": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "total": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "name",
+                "active",
+                "total"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "unknown": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "refused": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "active": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "since",
+          "routes",
+          "unknown",
+          "refused",
+          "active"
         ],
         "additionalProperties": false
       }

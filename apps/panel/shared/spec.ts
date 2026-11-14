@@ -12,7 +12,14 @@ import { MapSettings, compactMap } from './map-settings'
 export const SPEC_SCHEMA_PATH = '/schema/server-v1.json'
 
 /** Keys Flytower manages itself; edit them through their own settings. */
-export const MANAGED_PROPERTIES = ['server-port', 'enable-rcon', 'rcon.port', 'rcon.password']
+export const MANAGED_PROPERTIES = [
+  'server-port',
+  'enable-rcon',
+  'rcon.port',
+  'rcon.password',
+  // 127.0.0.1 behind the hostname router (#76), otherwise empty.
+  'server-ip',
+]
 
 /** Secrets Minecraft keeps in server.properties that Flytower knows by name. */
 export const SECRET_PROPERTIES = ['rcon.password', 'management-server-secret']

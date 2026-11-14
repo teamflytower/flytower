@@ -38,6 +38,7 @@ export const INSTALL_PERMISSIONS = [
   'system.integrations',
   'system.branding',
   'system.ssh',
+  'system.network',
   'activity.all',
 ] as const
 
@@ -174,6 +175,7 @@ export const PERMISSION_AREAS: { label: string; install: boolean; permissions: P
       'system.integrations',
       'system.branding',
       'system.ssh',
+      'system.network',
     ],
   },
 ]
@@ -192,6 +194,7 @@ export const POWERFUL: Partial<Record<Permission, string>> = {
   'roles.manage': 'Changing a role changes everyone who has it.',
   'system.updates': 'Can move Flytower to another version or channel.',
   'system.ssh': 'A shell on the machine Flytower runs on.',
+  'system.network': "Changes the machine's firewall and how players reach every server.",
 }
 
 /**
@@ -349,5 +352,9 @@ export const PERMISSION_LABELS: Record<Permission, { label: string; help: string
   },
   'system.branding': { label: 'Change branding', help: 'Name, logo, colours and fonts.' },
   'system.ssh': { label: 'Open SSH', help: 'A shell on the machine Flytower runs on.' },
+  'system.network': {
+    label: 'Manage addresses',
+    help: 'One address for every server, and the firewall that goes with it.',
+  },
   'activity.all': { label: 'See all activity', help: 'Otherwise only for servers they can see.' },
 }

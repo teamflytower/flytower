@@ -61,6 +61,12 @@ const systemSections = computed<Section[]>(() => [
     permission: 'system.branding',
   },
   {
+    label: 'Addresses',
+    icon: 'i-lucide-route',
+    to: '/system/addresses',
+    permission: 'system.network',
+  },
+  {
     label: 'SSH',
     icon: 'i-lucide-terminal-square',
     to: '/system/ssh',

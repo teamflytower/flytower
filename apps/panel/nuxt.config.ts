@@ -81,6 +81,8 @@ export default defineNuxtConfig({
   runtimeConfig: {
     version: '0.0.0-dev',
     agentSocket: '/run/flytower/agent.sock',
+    /** The hostname router's control socket (flytower-router, #76). */
+    routerSocket: '/run/flytower-router/router.sock',
     dbPath: '/var/lib/flytower/flytower.db',
     /** Where the agent puts server folders; the panel reads logs from here. */
     serversDir: '/srv/flytower/servers',
@@ -134,6 +136,7 @@ export default defineNuxtConfig({
       commandsDir: '.data/commands',
       runtimesDir: '.data/runtimes',
       agentSocket: '.data/agent.sock',
+      routerSocket: '.data/router.sock',
       setupTokenFile: '.data/setup-token.hash',
       devSetupToken: 'dev-setup-token',
     },

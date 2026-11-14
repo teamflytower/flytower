@@ -4,8 +4,8 @@
  *   bun scripts/package.ts --version 0.1.0 --arch amd64 [--bun /path/to/bun] [--out dist]
  *
  * Expects `bun run build` to have produced apps/panel/.output, cargo (with the toolchain in
- * crates/rust-toolchain.toml) for the Rust helpers, and go (the version in go/go.mod) for the
- * Go ones. Without --bun it downloads the official Bun release matching packageManager in
+ * crates/rust-toolchain.toml) for the Rust helpers, go (the version in go/go.mod) for the
+ * Go ones, and Java 25 for the flytower-proxy mod (Gradle comes with the mod's wrapper). Without --bun it downloads the official Bun release matching packageManager in
  * package.json and checks its hash.
  */
 import { chmod, cp, mkdir, rm } from 'node:fs/promises'
@@ -90,6 +90,24 @@ for (const bin of ['flytower-router']) {
     .env({ ...process.env, CGO_ENABLED: '0', GOOS: 'linux', GOARCH: arch })
   await chmod(target, 0o755)
 }
+// Their systemd units, which the agent installs when a feature that needs one is turned on.
+await mkdir(join(stage, 'systemd'), { recursive: true })
+await cp(
+  join(goModule, 'cmd/flytower-router/flytower-router.service'),
+  join(stage, 'systemd/flytower-router.service'),
+)
+
+// The flytower-proxy Fabric mod, which the panel puts in Fabric servers behind the hostname
+// router so they see players' real addresses (#76). A jar runs anywhere, so one build serves
+// both architectures; the second run finds it up to date. It's signed with the rest, through
+// SHA256SUMS.
+const modDir = join(repo, 'mods/flytower-proxy')
+await $`./gradlew jar --no-daemon --console=plain -q -Pmod_version=${version}`.cwd(modDir)
+await mkdir(join(stage, 'mods'), { recursive: true })
+await cp(
+  join(modDir, `build/libs/flytower-proxy-${version}.jar`),
+  join(stage, 'mods/flytower-proxy.jar'),
+)
 
 await cp(join(repo, 'installer/install.sh'), join(stage, 'install.sh'))
 await chmod(join(stage, 'install.sh'), 0o755)

@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "flytower-proxy",
+  "version": "${version}",
+  "name": "Flytower proxy",
+  "description": "Shows players' real addresses on a server behind Flytower's hostname router. It reads the PROXY protocol header only from connections made on this machine, and leaves every other connection alone.",
+  "authors": ["Flytower"],
+  "contributors": ["PanSzelescik", "jtnqr"],
+  "contact": {
+    "homepage": "https://flytower.dev",
+    "sources": "https://github.com/teamflytower/flytower/tree/main/mods/flytower-proxy"
+  },
+  "license": ["AGPL-3.0-only", "MIT"],
+  "environment": "server",
+  "mixins": ["flytower-proxy.mixins.json"],
+  "depends": {
+    "fabricloader": ">=0.17",
+    "minecraft": ">=26.1 <27",
+    "java": ">=25"
+  }
+}

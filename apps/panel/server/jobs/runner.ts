@@ -73,6 +73,8 @@ export interface RunnerDeps {
   startTimeoutMs?: number
   /** The machine's memory, for the budget. */
   totalMemoryMb?: () => number
+  /** The hostname router (#76): its port is never given to a server, and new servers join it. */
+  routing?: { reservedPorts(): number[]; serverChanged(name: string): Promise<void> }
 }
 
 export const STEPS = CREATE_SERVER_STEPS
@@ -215,7 +217,11 @@ export class JobRunner {
     }
     const tooBig = budgetProblem(this.totalMemoryMb(), this.memoryUsers(), { name, memoryMb })
     if (tooBig) throw new JobError(tooBig)
-    const used = new Set([...this.reservedPorts, ...rows.flatMap((r) => [r.port, r.rcon])])
+    const used = new Set([
+      ...this.reservedPorts,
+      ...(this.deps.routing?.reservedPorts() ?? []),
+      ...rows.flatMap((r) => [r.port, r.rcon]),
+    ])
     if (requested !== undefined && used.has(requested)) {
       throw new JobError(`Port ${requested} is already used by another server.`)
     }
@@ -384,6 +390,8 @@ export class JobRunner {
           map: extras.map ?? null,
         })
         .run()
+      // With routing on, a server with a hostname listens on 127.0.0.1 behind the router.
+      await this.deps.routing?.serverChanged(input.name)
 
       step('Starting the server')
       await agent('service.start', { server: input.name })

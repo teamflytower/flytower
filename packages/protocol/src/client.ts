@@ -1,6 +1,8 @@
 import type { Socket } from 'bun'
 import { AgentError, Response } from './envelope.ts'
 import { encode, lineSplitter } from './framing.ts'
+import type { z } from 'zod'
+import { routerVerbs, type RouterVerb } from './router.ts'
 import { verbs, type Params, type Result, type Verb } from './verbs.ts'
 
 export interface CallOptions {
@@ -17,9 +19,30 @@ export interface CallOptions {
 export function callAgent<V extends Verb>(
   verb: V,
   params: Params<V>,
-  { socketPath, timeoutMs = 30_000 }: CallOptions,
+  opts: CallOptions,
 ): Promise<Result<V>> {
-  const spec = verbs[verb]
+  return call('agent', verbs[verb], verb, params, opts) as Promise<Result<V>>
+}
+
+export type RouterParams<V extends RouterVerb> = z.infer<(typeof routerVerbs)[V]['params']>
+export type RouterResult<V extends RouterVerb> = z.infer<(typeof routerVerbs)[V]['result']>
+
+/** Calls the hostname router's control socket, which speaks the same envelope. */
+export function callRouter<V extends RouterVerb>(
+  verb: V,
+  params: RouterParams<V>,
+  opts: CallOptions,
+): Promise<RouterResult<V>> {
+  return call('router', routerVerbs[verb], verb, params, opts) as Promise<RouterResult<V>>
+}
+
+function call(
+  who: string,
+  spec: { params: z.ZodType; result: z.ZodType },
+  verb: string,
+  params: unknown,
+  { socketPath, timeoutMs = 30_000 }: CallOptions,
+): Promise<unknown> {
   const checked = spec.params.safeParse(params)
   if (!checked.success) {
     return Promise.reject(new AgentError('invalid_params', checked.error.issues[0]?.message ?? ''))
@@ -37,7 +60,7 @@ export function callAgent<V extends Verb>(
       fn()
     }
     const fail = (message: string) => finish(() => reject(new AgentError('internal', message)))
-    const timer = setTimeout(() => fail(`agent did not answer ${verb} in time`), timeoutMs)
+    const timer = setTimeout(() => fail(`${who} did not answer ${verb} in time`), timeoutMs)
 
     const feed = lineSplitter(
       (line) => {
@@ -49,10 +72,10 @@ export function callAgent<V extends Verb>(
           return
         }
         const result = spec.result.safeParse(res.result)
-        if (!result.success) return fail('agent returned an unexpected result')
-        finish(() => resolve(result.data as Result<V>))
+        if (!result.success) return fail(`${who} returned an unexpected result`)
+        finish(() => resolve(result.data))
       },
-      () => fail('agent reply too long'),
+      () => fail(`${who} reply too long`),
     )
 
     Bun.connect({
@@ -66,10 +89,10 @@ export function callAgent<V extends Verb>(
           feed(chunk)
         },
         close() {
-          fail('agent closed the connection')
+          fail(`${who} closed the connection`)
         },
         error(_socket, err) {
-          fail(`agent unreachable: ${err.message}`)
+          fail(`${who} unreachable: ${err.message}`)
         },
       },
     }).then(
@@ -77,7 +100,7 @@ export function callAgent<V extends Verb>(
         conn = socket
         if (settled) socket.end()
       },
-      (err: Error) => fail(`agent unreachable: ${err.message}`),
+      (err: Error) => fail(`${who} unreachable: ${err.message}`),
     )
   })
 }

@@ -112,6 +112,13 @@ jobs:
         with:
           go-version-file: go/go.mod
           cache-dependency-path: go/go.sum
+      - name: Java (for the flytower-proxy mod, mods/flytower-proxy)
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: gradle
+          cache-dependency-path: mods/flytower-proxy/*.gradle*
 
       - run: bun install --frozen-lockfile
       - run: bun run lint

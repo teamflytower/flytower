@@ -1,0 +1,47 @@
+// flytower-proxy: reads the PROXY protocol header the hostname router sends, so a Fabric
+// server sees each player's real address. Built with `bun scripts/package.ts` (via
+// scripts/mods.ts), or here with ./gradlew build.
+plugins {
+    id 'net.fabricmc.fabric-loom' version "${loom_version}"
+}
+
+version = providers.gradleProperty('mod_version').getOrElse('0.0.0-dev')
+group = 'dev.flytower'
+base.archivesName = 'flytower-proxy'
+
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+
+    testImplementation "org.junit.jupiter:junit-jupiter:${project.junit_version}"
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(25)
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 25
+    options.encoding = 'UTF-8'
+}
+
+test {
+    useJUnitPlatform()
+    // The fixtures every implementation of the PROXY header shares.
+    systemProperty 'fixtures', file('../../protocol/fixtures').absolutePath
+}
+
+processResources {
+    inputs.property 'version', project.version
+    filesMatching('fabric.mod.json') {
+        expand 'version': project.version
+    }
+}
+
+jar {
+    from('NOTICE.md')
+    // Reproducible: the same source gives the same jar, so its hash can be checked.
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+}

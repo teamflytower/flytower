@@ -58,7 +58,7 @@ bun run --filter @flytower/dev-agent dev   # terminal 1
 bun run --filter @flytower/panel dev       # terminal 2, then open http://localhost:3000 (setup token: dev-setup-token)
 ```
 
-The agent, updater and other root helpers are in Rust (`crates/`), and the networking helpers, starting with the hostname router, are in Go (`go/`). You only need those toolchains to work on them; the versions are pinned in `crates/rust-toolchain.toml` and `go/go.mod`. [Decision record 0001](docs/decisions/0001-rust-and-go.md#building) says how to build and check each.
+The agent, updater and other root helpers are in Rust (`crates/`), and the networking helpers, starting with the hostname router, are in Go (`go/`). The `flytower-proxy` Fabric mod (`mods/`) is Java, built with its Gradle wrapper and Java 25. You only need those toolchains to work on them; the versions are pinned in `crates/rust-toolchain.toml`, `go/go.mod` and `mods/flytower-proxy/gradle.properties`. [Decision record 0001](docs/decisions/0001-rust-and-go.md#building) says how to build and check each.
 
 Commit and pull request titles use Conventional Commits (`feat:`, `fix:`, `docs:` and so on), because release notes are built from them.
 
@@ -74,6 +74,7 @@ Commit and pull request titles use Conventional Commits (`feat:`, `fix:`, `docs:
 | `packages/rcon`      | Minecraft RCON client                                                                         |
 | `crates/`            | Rust helpers: the agent, the updater, `flytower-du` and `flytower-map`                        |
 | `go/`                | Go helpers: `flytower-router`, and the protocol envelope in Go                                |
+| `mods/`              | Minecraft mods Flytower ships: `flytower-proxy`, which shows real addresses behind the router |
 | `protocol/`          | The agent protocol exported as JSON Schema, and fixtures every language replays               |
 | `installer/`         | One-line installer for a fresh Ubuntu or Debian VPS                                           |
 | `scripts/`           | Release packaging and notes                                                                   |

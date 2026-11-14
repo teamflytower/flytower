@@ -250,6 +250,27 @@ export const verbs = {
     params: z.object({}).strict(),
     result: z.object({ freedBytes: Bytes, removed: z.array(z.string()) }),
   },
+  /**
+   * Opens or closes a server's own port in the firewall. A server reached through the
+   * hostname router has no public port of its own.
+   */
+  'server.expose': {
+    params: z.object({ name: ServerName, port: Port, public: z.boolean() }).strict(),
+    result: z.object({}),
+  },
+  /**
+   * Starts the hostname router (flytower-router) from the current release, listening on
+   * `port`, and opens that port in the firewall. Rust agent only.
+   */
+  'router.enable': {
+    params: z.object({ port: Port }).strict(),
+    result: z.object({}),
+  },
+  /** Stops the hostname router and closes its port. Its kept routes stay on disk. */
+  'router.disable': {
+    params: z.object({}).strict(),
+    result: z.object({}),
+  },
 } as const
 
 export type Verb = keyof typeof verbs

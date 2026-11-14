@@ -108,3 +108,14 @@
 {"verb":"disk.prune-flytower","kind":"params","valid":false,"note":"can't name releases","value":{"keep":["1.2.0"]}}
 {"verb":"disk.prune-flytower","kind":"result","valid":true,"value":{"freedBytes":45000000,"removed":["1.1.0"]}}
 {"verb":"disk.prune-flytower","kind":"result","valid":false,"note":"removed must be a list","value":{"freedBytes":0,"removed":"1.1.0"}}
+{"verb":"server.expose","kind":"params","valid":true,"value":{"name":"survival","port":25566,"public":false}}
+{"verb":"server.expose","kind":"params","valid":false,"note":"public is required","value":{"name":"survival","port":25566}}
+{"verb":"server.expose","kind":"params","valid":false,"note":"ports below 1024 need root","value":{"name":"survival","port":80,"public":true}}
+{"verb":"server.expose","kind":"result","valid":true,"value":{}}
+{"verb":"router.enable","kind":"params","valid":true,"value":{"port":25565}}
+{"verb":"router.enable","kind":"params","valid":false,"note":"the port is required","value":{}}
+{"verb":"router.enable","kind":"params","valid":false,"note":"unknown key","value":{"port":25565,"listen":"0.0.0.0"}}
+{"verb":"router.enable","kind":"result","valid":true,"value":{}}
+{"verb":"router.disable","kind":"params","valid":true,"value":{}}
+{"verb":"router.disable","kind":"params","valid":false,"note":"unknown key","value":{"port":25565}}
+{"verb":"router.disable","kind":"result","valid":true,"value":{}}

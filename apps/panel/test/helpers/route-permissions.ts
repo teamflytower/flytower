@@ -100,6 +100,8 @@ export const ROUTE_PERMISSIONS: Record<string, string> = {
   'system/notify/index.get.ts': 'system.notifications',
   'system/notify/index.post.ts': 'system.notifications',
   'system/notify/test.post.ts': 'system.notifications',
+  'system/router.get.ts': 'system.network',
+  'system/router.post.ts': 'system.network',
   'system/ssh.get.ts': 'system.ssh',
   'system/ssh.post.ts': 'system.ssh',
   'system/updates/channel.put.ts': 'system.updates',

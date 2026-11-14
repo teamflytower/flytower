@@ -99,6 +99,12 @@ export function contentDir(kind: LockedItem['kind'], levelName: string) {
 }
 
 /**
+ * The hostname router's proxy mod, which the panel puts in Fabric servers itself while
+ * routing is on (server/routing/files.ts). It isn't the server's content.
+ */
+const PANEL_FILES = new Set(['mods/flytower-proxy.jar'])
+
+/**
  * Files in the content folders that the lockfile doesn't know about: put there by hand, so
  * they're shown and left alone.
  */
@@ -112,7 +118,7 @@ export async function unmanagedFiles(dir: string, lock: Lock, levelName: string)
       const path = `${sub}/${name}`
       const fits =
         kind === 'datapack' ? /\.zip$/i.test(name) || !name.includes('.') : /\.jar$/i.test(name)
-      if (fits && !known.has(path)) out.push({ path, kind })
+      if (fits && !known.has(path) && !PANEL_FILES.has(path)) out.push({ path, kind })
     }
   }
   return out

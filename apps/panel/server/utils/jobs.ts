@@ -12,6 +12,15 @@ export function useLoaders() {
 
 /** The one job runner for this process. */
 export function useJobs(): JobRunner {
-  runner ??= new JobRunner({ db: useDb(), agent, loaders: useLoaders(), fetch })
+  runner ??= new JobRunner({
+    db: useDb(),
+    agent,
+    loaders: useLoaders(),
+    fetch,
+    routing: {
+      reservedPorts: () => useRouting().reservedPorts(),
+      serverChanged: (name) => useRouting().serverChanged(name),
+    },
+  })
   return runner
 }

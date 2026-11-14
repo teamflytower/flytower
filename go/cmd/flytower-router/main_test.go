@@ -2,13 +2,20 @@ package main
 
 import (
 	"bytes"
+	"context"
+	"net"
+	"path/filepath"
+	"strings"
 	"testing"
+
+	"github.com/teamflytower/flytower/go/router"
+	"github.com/teamflytower/flytower/go/router/control"
 )
 
 func TestVersion(t *testing.T) {
-	for _, args := range [][]string{nil, {"--version"}, {"version"}} {
+	for _, args := range [][]string{{"--version"}, {"version"}} {
 		var out, errs bytes.Buffer
-		if code := run(args, &out, &errs); code != 0 {
+		if code := run(args, nil, &out, &errs); code != 0 {
 			t.Fatalf("%q: exit %d", args, code)
 		}
 		if got := out.String(); got != "flytower-router dev\n" {
@@ -17,12 +24,49 @@ func TestVersion(t *testing.T) {
 	}
 }
 
-func TestUnknownArgument(t *testing.T) {
-	var out, errs bytes.Buffer
-	if code := run([]string{"--nope"}, &out, &errs); code != 2 {
-		t.Fatalf("exit %d, want 2", code)
+func TestUsage(t *testing.T) {
+	for _, args := range [][]string{nil, {"--nope"}, {"ctl"}} {
+		var out, errs bytes.Buffer
+		if code := run(args, nil, &out, &errs); code != 2 {
+			t.Errorf("%q: exit %d, want 2", args, code)
+		}
+		if !strings.Contains(errs.String(), "usage") {
+			t.Errorf("%q: no usage message", args)
+		}
 	}
-	if errs.Len() == 0 {
-		t.Error("no usage message")
+}
+
+func TestCtl(t *testing.T) {
+	dir := t.TempDir()
+	sock := filepath.Join(dir, "router.sock")
+	ln, err := net.ListenUnix("unix", &net.UnixAddr{Name: sock, Net: "unix"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	s := &control.Server{Router: router.New(router.Config{}), StatePath: filepath.Join(dir, "routes.json"), Version: "test"}
+	go func() { _ = s.Serve(ctx, ln) }()
+
+	var out, errs bytes.Buffer
+	if code := run([]string{"ctl", "-control", sock, "ping"}, nil, &out, &errs); code != 0 {
+		t.Fatalf("ping: exit %d: %s", code, errs.String())
+	}
+	if !strings.Contains(out.String(), `"routerVersion": "test"`) {
+		t.Errorf("ping printed %s", out.String())
+	}
+
+	table := `{"routes":[],"messages":{"unknownMotd":"","unknownDisconnect":"","stoppedMotd":"","stoppedDisconnect":"","startingMotd":"","startingDisconnect":"","bannedDisconnect":""}}`
+	out.Reset()
+	if code := run([]string{"ctl", "-control", sock, "routes.set", "-"}, strings.NewReader("\n"+table+"\n"), &out, &errs); code != 0 {
+		t.Fatalf("routes.set: exit %d: %s", code, errs.String())
+	}
+
+	errs.Reset()
+	if code := run([]string{"ctl", "-control", sock, "routes.set", "{}"}, nil, &out, &errs); code != 1 {
+		t.Errorf("bad table: exit %d", code)
+	}
+	if !strings.Contains(errs.String(), "invalid_params") {
+		t.Errorf("bad table: %s", errs.String())
 	}
 }

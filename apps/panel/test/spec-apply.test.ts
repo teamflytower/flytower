@@ -481,6 +481,8 @@ describe('plan', () => {
     mkdirSync(join(dir, 'mods'))
     writeFileSync(join(dir, 'mods', 'lithium-0.19.jar'), 'by hand')
     writeFileSync(join(dir, 'mods', 'other.jar'), 'by hand')
+    // The hostname router's mod is the panel's own, not content.
+    writeFileSync(join(dir, 'mods', 'flytower-proxy.jar'), 'from the release')
     const plan = await service.plan('survival', spec({ content: [{ modrinth: 'lithium' }] }))
     expect(plan.unmanaged).toEqual(['mods/lithium-0.19.jar', 'mods/other.jar'])
     expect(plan.problems[0]).toContain('added by hand')

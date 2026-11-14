@@ -48,6 +48,7 @@ export function useSpecs(): SpecService {
     fetch,
     readProperties,
     writeProperties,
+    addressChanged: (name) => useRouting().serverChanged(name),
     schedulesChanged: syncBackupSchedules,
     statsChanged,
     tasks: useSchedules(),

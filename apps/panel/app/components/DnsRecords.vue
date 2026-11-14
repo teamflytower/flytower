@@ -9,10 +9,14 @@ interface Checked {
   hint?: string
 }
 const props = defineProps<{ server: string; hostname: string }>()
-const { data, refresh, status } = await useFetch<{ records: Checked[] }>(
-  () => `/api/servers/${props.server}/dns`,
-  { watch: [() => props.hostname], default: () => ({ records: [] }) },
-)
+const { data, refresh, status } = await useFetch<{
+  records: Checked[]
+  routed?: boolean
+  staleSrv?: string | null
+}>(() => `/api/servers/${props.server}/dns`, {
+  watch: [() => props.hostname],
+  default: () => ({ records: [] }),
+})
 const BADGE = {
   ok: { label: 'Right', color: 'success' },
   missing: { label: 'Missing', color: 'warning' },
@@ -100,6 +104,19 @@ const srvParts = (v: string) => {
       <p v-if="r.status === 'wrong'" class="text-muted">Points at {{ r.found.join(', ') }} now.</p>
       <p v-if="r.hint" class="text-warning">{{ r.hint }}</p>
     </div>
+    <UAlert
+      v-if="data.staleSrv"
+      color="warning"
+      variant="subtle"
+      icon="i-lucide-triangle-alert"
+      title="Delete the SRV record"
+      :description="`${data.staleSrv} still sends players to this server's own port, which is closed now that it shares the router's address.`"
+      data-e2e="dns-stale-srv"
+    />
+    <p v-if="data.routed" class="text-xs text-muted">
+      This server shares one address with the others (System, Addresses), so it needs no SRV record.
+      A wildcard record such as *.example.com covers every server.
+    </p>
     <p class="text-xs text-muted">
       Create these with whoever runs your domain. If it's Cloudflare, set each to DNS only (grey
       cloud). Changes can take a few minutes to show here.

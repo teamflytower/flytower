@@ -168,6 +168,20 @@ pub struct VersionParam {
     pub version: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ExposeParams {
+    pub name: String,
+    pub port: i64,
+    pub public: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PortParam {
+    pub port: i64,
+}
+
 /// A request's params, checked.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Params {
@@ -193,10 +207,13 @@ pub enum Params {
     DiskVacuumJournal(VacuumParams),
     DiskCleanApt,
     DiskPruneFlytower,
+    ServerExpose(ExposeParams),
+    RouterEnable(PortParam),
+    RouterDisable,
 }
 
 /// Every verb, in the same order as `verbs.ts`.
-pub const VERBS: [&str; 22] = [
+pub const VERBS: [&str; 25] = [
     "ping",
     "agent.hello",
     "service.status",
@@ -219,6 +236,9 @@ pub const VERBS: [&str; 22] = [
     "disk.vacuum-journal",
     "disk.clean-apt",
     "disk.prune-flytower",
+    "server.expose",
+    "router.enable",
+    "router.disable",
 ];
 
 fn de<T: DeserializeOwned>(value: &Value) -> Result<T, String> {
@@ -342,6 +362,18 @@ impl Params {
             }
             "disk.clean-apt" => de::<Empty>(params).map(|_| Self::DiskCleanApt)?,
             "disk.prune-flytower" => de::<Empty>(params).map(|_| Self::DiskPruneFlytower)?,
+            "server.expose" => {
+                let p: ExposeParams = de(params)?;
+                server(&p.name)?;
+                port(p.port)?;
+                Self::ServerExpose(p)
+            }
+            "router.enable" => {
+                let p: PortParam = de(params)?;
+                port(p.port)?;
+                Self::RouterEnable(p)
+            }
+            "router.disable" => de::<Empty>(params).map(|_| Self::RouterDisable)?,
             _ => return Ok(None),
         };
         Ok(Some(p))
@@ -572,7 +604,9 @@ pub fn check_result(verb: &str, result: &Value) -> Result<(), String> {
         "service.usage" => de::<UsageResult>(result).map(drop),
         "service.wait" => de::<WaitResult>(result).map(drop),
         "service.start" | "service.stop" | "service.restart" | "server.configure"
-        | "server.permissions" => de::<EmptyResult>(result).map(drop),
+        | "server.permissions" | "server.expose" | "router.enable" | "router.disable" => {
+            de::<EmptyResult>(result).map(drop)
+        }
         "runtime.install" => de::<RuntimeResult>(result).map(drop),
         "server.create" => de::<CreateResult>(result).map(drop),
         "ssh.status" | "ssh.set" => de::<SshState>(result).map(drop),

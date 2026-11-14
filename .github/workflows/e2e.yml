@@ -16,6 +16,7 @@ on:
       - '.github/workflows/board.yml'
       - '.github/workflows/ci.yml'
       - '.github/workflows/go.yml'
+      - '.github/workflows/mods.yml'
       - '.github/workflows/pr-build.yml'
       - '.github/workflows/release-notes.yml'
       - '.github/workflows/docs-screens.yml'
@@ -63,6 +64,13 @@ jobs:
         with:
           go-version-file: go/go.mod
           cache-dependency-path: go/go.sum
+      - name: Java (for the flytower-proxy mod, mods/flytower-proxy)
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: gradle
+          cache-dependency-path: mods/flytower-proxy/*.gradle*
       - run: bun install --frozen-lockfile
       - run: bun run build
       # The agents build the key in, so this comes before packaging. The private half never
@@ -195,6 +203,13 @@ jobs:
           # Leave it as the installer did.
           call ssh.set '{"open":true}'
           docker exec vps ufw --force disable
+
+      - name: Hostname router starts, takes routes and answers
+        run: |
+          docker exec vps /opt/flytower/current/bin/bun /src/tests/e2e/router.ts || {
+            docker exec vps journalctl -u flytower-router --no-pager -n 50 || true
+            exit 1
+          }
 
       - name: The Rust agent, and nothing else
         run: |

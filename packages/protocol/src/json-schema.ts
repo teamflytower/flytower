@@ -18,6 +18,7 @@ import {
   Response,
   Subscribe,
 } from './envelope.ts'
+import { routerVerbNames, routerVerbs } from './router.ts'
 import { subscriptionNames, subscriptions, verbNames, verbs } from './verbs.ts'
 
 const toSchema = (schema: z.ZodType) => {
@@ -40,6 +41,15 @@ export function protocolJsonSchema() {
       [...verbNames]
         .sort()
         .map((v) => [v, { params: toSchema(verbs[v].params), result: toSchema(verbs[v].result) }]),
+    ),
+    /** The hostname router's control socket, which uses the same envelope. */
+    routerVerbs: Object.fromEntries(
+      [...routerVerbNames]
+        .sort()
+        .map((v) => [
+          v,
+          { params: toSchema(routerVerbs[v].params), result: toSchema(routerVerbs[v].result) },
+        ]),
     ),
     subscribe: toSchema(Subscribe),
     cancel: toSchema(Cancel),

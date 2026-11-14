@@ -58,6 +58,8 @@ export interface SpecDeps {
   writeProperties: (name: string, changes: Record<string, string>) => Promise<void>
   /** Called after backup settings change. */
   schedulesChanged?: () => void
+  /** Called after a server's hostname or port changed, for the hostname router (#76). */
+  addressChanged?: (name: string) => Promise<void>
   /** Called after player stats settings change, to stop recording or forget players. */
   statsChanged?: (name: string, before: unknown) => void
   /** Called after settings are saved, so the map service starts or stops drawing. */
@@ -484,5 +486,6 @@ export class SpecService {
       tasks?.replace(name, s.schedules ?? tasks.tasks(name), s.timezone)
     }
     if (s.offsiteTarget) this.deps.offsiteChanged?.(name)
+    if (s.hostname !== undefined || s.port !== undefined) await this.deps.addressChanged?.(name)
   }
 }

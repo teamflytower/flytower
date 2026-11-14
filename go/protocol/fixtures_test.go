@@ -56,6 +56,9 @@ func TestEnvelopeFixtures(t *testing.T) {
 			got = err == nil
 		case "response":
 			got = ValidResponse(fx.Value)
+		case "subscribe", "cancel", "frame":
+			// Protocol version 2's subscriptions: the agent's, which the router doesn't use.
+			continue
 		default:
 			t.Fatalf("unknown kind %q", fx.Kind)
 		}

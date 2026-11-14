@@ -1,0 +1,59 @@
+# The hostname router (flytower-router). Off by default: the panel's "One address for every
+# server" setting installs and starts it (#76). Releases ship this file as
+# systemd/flytower-router.service.
+[Unit]
+Description=Flytower hostname router
+Documentation=https://github.com/teamflytower/flytower/blob/main/docs/addresses.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+ExecStart=/opt/flytower/current/bin/flytower-router serve --allow-user flytower
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=1
+
+# Its own throwaway user, with no access to the panel's or the servers' files. Port 25565
+# needs no privileges. No PrivateUsers=: it would hide the panel's user id from the control
+# socket's SO_PEERCRED check.
+DynamicUser=yes
+User=flytower-router
+StateDirectory=flytower-router
+StateDirectoryMode=0700
+RuntimeDirectory=flytower-router
+RuntimeDirectoryMode=0755
+CapabilityBoundingSet=
+AmbientCapabilities=
+NoNewPrivileges=yes
+
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectHostname=yes
+ProtectClock=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectProc=invisible
+ProcSubset=pid
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RemoveIPC=yes
+UMask=0077
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged
+
+LimitNOFILE=16384
+MemoryMax=256M
+TasksMax=512
+
+[Install]
+WantedBy=multi-user.target

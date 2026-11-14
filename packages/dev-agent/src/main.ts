@@ -187,6 +187,10 @@ const handlers: Handlers = {
     }
     return { usage }
   },
+  // The router and firewall do nothing here; the panel talks to a real router if one runs.
+  'server.expose': async () => ({}),
+  'router.enable': async () => ({}),
+  'router.disable': async () => ({}),
   'service.start': async ({ server }) => {
     freshStart(server)
     move(server, 'activating', 'active')

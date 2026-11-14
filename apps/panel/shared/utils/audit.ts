@@ -160,6 +160,12 @@ export function describeAudit(
       return `Opened SSH${d.minutes ? ` for ${str(d.minutes)} minutes` : ''}`
     case 'ssh.close':
       return 'Closed SSH'
+    case 'router.enable':
+      return `Turned on one address for every server, on port ${str(d.port)}`
+    case 'router.disable':
+      return 'Turned off one address for every server; each server has its own port again'
+    case 'router.messages':
+      return 'Changed what players see for addresses with no server'
     case 'disk.clean': {
       const n = typeof d.freedBytes === 'number' ? d.freedBytes : null
       const freed = n === null ? '' : n > 0 ? `, freeing ${humanBytes(n)}` : ', which freed nothing'

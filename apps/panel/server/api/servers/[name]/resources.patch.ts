@@ -58,6 +58,12 @@ export default defineEventHandler(async (event) => {
         ),
       )
       .get()
+    if (useRouting().reservedPorts().includes(port)) {
+      throw createError({
+        statusCode: 409,
+        statusMessage: `Port ${port} is the router's: every server with an address shares it.`,
+      })
+    }
     if (clash || port === server.rconPort) {
       throw createError({
         statusCode: 409,
@@ -88,6 +94,13 @@ export default defineEventHandler(async (event) => {
     })
     .where(eq(schema.servers.name, name))
     .run()
+  if (port !== undefined || hostname !== undefined) {
+    try {
+      await useRouting().serverChanged(name)
+    } catch (err) {
+      throw createError({ statusCode: 502, statusMessage: (err as Error).message })
+    }
+  }
   db.insert(schema.audit)
     .values({
       userId: user.id,

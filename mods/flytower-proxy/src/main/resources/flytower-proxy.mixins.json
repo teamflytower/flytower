@@ -1,0 +1,10 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "dev.flytower.proxy.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "server": ["ChannelInitializerInvoker", "ConnectionAccessor", "ServerConnectionListenerMixin"],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

@@ -54,5 +54,6 @@ export default defineEventHandler(async (event) => {
     .values({ userId: user.id, action: 'server.delete', target: name, detail: { archivedTo } })
     .run()
   await useStatus().poke()
+  useRouting().sync()
   return { archivedTo }
 })

@@ -24,7 +24,7 @@ pub fn ufw_comment(server: &str) -> String {
     format!("flytower server {server}")
 }
 
-fn run(ctx: &Context, file: &str, args: &[&str]) -> Result<String, AgentError> {
+pub(crate) fn run(ctx: &Context, file: &str, args: &[&str]) -> Result<String, AgentError> {
     let r = ctx.exec.run(file, args);
     if r.code != 0 {
         let stderr = r.stderr.trim();
@@ -191,6 +191,29 @@ fn swap_firewall_rule(name: &str, port: i64, ctx: &Context) -> Result<(), AgentE
     Ok(())
 }
 
+/// `server.expose`: opens the server's own port in the firewall, or closes it when players
+/// reach the server through the hostname router instead.
+///
+/// # Errors
+/// `not_found` for an unknown server, `failed` if ufw fails.
+pub fn expose(name: &str, port: i64, public: bool, ctx: &Context) -> Result<Value, AgentError> {
+    if !files(ctx, name).env.exists() {
+        return Err(AgentError::new(
+            ErrorCode::NotFound,
+            format!("no server called {name}"),
+        ));
+    }
+    if public {
+        swap_firewall_rule(name, port, ctx)?;
+    } else {
+        let status = ctx.exec.run("ufw", &["status", "numbered"]);
+        for n in ufw_rule_numbers(&status.stdout, name) {
+            run(ctx, "ufw", &["--force", "delete", &n.to_string()])?;
+        }
+    }
+    Ok(json!({}))
+}
+
 /// `server.configure`: memory and Java rewrite the env file (memory also the `MemoryMax`
 /// drop-in); port swaps the firewall rule. All take effect on the next restart.
 ///
@@ -275,7 +298,12 @@ pub fn permissions(name: &str, ctx: &Context) -> Result<Value, AgentError> {
 /// rest. Lines look like `[ 2] 25565/tcp  ALLOW IN  Anywhere  # flytower server survival`.
 #[must_use]
 pub fn ufw_rule_numbers(status_numbered: &str, name: &str) -> Vec<u32> {
-    let wanted = ufw_comment(name);
+    ufw_rules_tagged(status_numbered, &ufw_comment(name))
+}
+
+/// Rule numbers whose comment is exactly `wanted`, highest first.
+#[must_use]
+pub fn ufw_rules_tagged(status_numbered: &str, wanted: &str) -> Vec<u32> {
     let mut numbers: Vec<u32> = status_numbered
         .lines()
         .filter_map(|line| {
@@ -420,6 +448,39 @@ mod tests {
         let s = Setup::new(vec![("id -u", absent())]);
         let err = create("survival", 25565, 6144, 21, &s.ctx()).unwrap_err();
         assert!(err.message.contains("Java 21"), "{}", err.message);
+    }
+
+    #[test]
+    fn exposes_and_hides_a_server() {
+        let status = "[ 1] 25566/tcp  ALLOW IN    Anywhere    # flytower server survival\n\
+                      [ 2] 25565/tcp  ALLOW IN    Anywhere    # flytower router\n";
+        let s = Setup::new(vec![("ufw status numbered", out(status))]);
+        assert_eq!(
+            expose("survival", 25566, false, &s.ctx()).unwrap_err().code,
+            ErrorCode::NotFound
+        );
+        fs::create_dir_all(s.path("etc/servers")).unwrap();
+        fs::write(s.path("etc/servers/survival.env"), "HEAP_MB=1024\n").unwrap();
+
+        expose("survival", 25566, false, &s.ctx()).unwrap();
+        let cmds = s.fake.ran();
+        assert!(
+            cmds.contains(&"ufw --force delete 1".to_string()),
+            "{cmds:?}"
+        );
+        assert!(!cmds.iter().any(|c| c.starts_with("ufw allow")), "{cmds:?}");
+        assert!(
+            !cmds.contains(&"ufw --force delete 2".to_string()),
+            "touched the router's rule"
+        );
+
+        s.fake.clear();
+        expose("survival", 25566, true, &s.ctx()).unwrap();
+        assert!(
+            s.fake
+                .ran()
+                .contains(&"ufw allow 25566/tcp comment flytower server survival".to_string())
+        );
     }
 
     #[test]
