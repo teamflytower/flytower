@@ -7,6 +7,7 @@ const columns = [
       { label: 'Docs', to: '/docs' },
       { label: 'Install', to: '/docs/install' },
       { label: 'Changelog', to: '/changelog' },
+      { label: 'FAQ', to: '/faq' },
       { label: 'Why Flytower?', to: '/why-flytower' },
     ],
   },
