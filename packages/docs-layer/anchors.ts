@@ -232,6 +232,15 @@ export const docAnchors = {
     need: 'world.manage',
   },
 
+  // Trim rules, in the World tab's Tools
+  'world.trim-rules': {
+    label: 'What trimming keeps',
+    route: '/servers/:name/world#tools',
+    kind: 'section',
+    icon: 'i-lucide-scissors',
+    need: 'world.manage',
+  },
+
   // Public page and Discord chat, in a server's Settings, Community
   'community.public-page': {
     label: 'Public page',
