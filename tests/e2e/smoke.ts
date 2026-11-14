@@ -599,11 +599,24 @@ try {
       },
     })
     if (rules.status !== 200) throw new Error(`trim rules: ${JSON.stringify(rules.body)}`)
+    // The page may already be the World tab, and a change of #hash alone never finishes
+    // loading, so start from a blank page.
+    await view.navigate('about:blank')
     await view.navigate(`${base}/servers/smoke/world#tools`)
-    await until('the Preview and trim button', () =>
-      view.evaluate<boolean>(`!!document.querySelector('[data-e2e=trim-open]')`),
+    await until(
+      'the Preview and trim button',
+      () =>
+        view.evaluate<boolean>(`(() => {
+          const b = document.querySelector('[data-e2e=trim-open]')
+          if (b && b.getClientRects().length) return b.click(), true
+          // Open the Tools section if the address didn't.
+          const t = document.querySelector('[data-e2e=section-tools] button')
+          if (t && !b) t.click()
+          return false
+        })()`),
+      30_000,
+      500,
     )
-    await view.click('[data-e2e=trim-open]')
     const preview = await until(
       'the trim preview',
       () =>
@@ -618,7 +631,16 @@ try {
     )
     if (!/would remove/.test(preview)) throw new Error(`trim preview: ${preview}`)
     await shot('3a-trim-preview')
-    await view.click('[data-e2e=trim-confirm]')
+    await until(
+      'the Trim button',
+      () =>
+        view.evaluate<boolean>(`(() => {
+          const b = document.querySelector('[data-e2e=trim-confirm]')
+          return b && !b.disabled ? (b.click(), true) : false
+        })()`),
+      30_000,
+      500,
+    )
     const trimmed = await until(
       'the trim to finish',
       () =>
