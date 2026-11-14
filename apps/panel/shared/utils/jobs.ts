@@ -88,3 +88,11 @@ export const WORLD_RESET_STEPS = [
   'Setting the seed',
   'Starting the server',
 ] as const
+
+export const WORLD_TRIM_STEPS = [
+  'Checking free space',
+  'Backing up',
+  'Stopping the server',
+  'Trimming',
+  'Starting the server',
+] as const

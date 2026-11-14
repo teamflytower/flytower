@@ -1,11 +1,19 @@
 /**
- * The world: pre-generating it with Chunky, and resetting it. All folder access goes
- * through here, so it can become agent verbs for other machines later (#29).
+ * The world: pre-generating it with Chunky, trimming unused chunks, and resetting it. All
+ * folder access goes through here, so it can become agent verbs for other machines later
+ * (#29).
  */
 import { readdir, rename, rm, mkdir, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { eq } from 'drizzle-orm'
-import { WORLD_COPY_STEPS, WORLD_RESET_STEPS, type JobEvent } from '../../shared/utils/jobs'
+import {
+  WORLD_COPY_STEPS,
+  WORLD_RESET_STEPS,
+  WORLD_TRIM_STEPS,
+  type JobEvent,
+} from '../../shared/utils/jobs'
+import type { TrimPreview, TrimReport } from '../../shared/trim-report'
+import type { NotifyEvent } from '../notify/types'
 import { folderBytes } from '../backups/service'
 import { copyFolder } from '../clone'
 import { schema, type Db } from '../db'
@@ -21,6 +29,7 @@ import {
   type ChunkyTask,
   type PregenOptions,
 } from './chunky'
+import { trimSummary, runTrim, trimNeedBytes, type WorldTool } from './trim'
 
 export class WorldError extends JobError {}
 
@@ -39,6 +48,9 @@ export interface WorldDeps {
   writeProperties: (name: string, changes: Record<string, string>) => Promise<void>
   stopped?: (name: string) => void
   sleep?: (ms: number) => Promise<void>
+  /** Runs `flytower-world`, for trimming. */
+  worldTool?: WorldTool
+  notify?: (e: NotifyEvent) => void
 }
 
 export interface PregenStatus {
@@ -59,8 +71,15 @@ export interface ResetOptions {
   keepBackup?: boolean
 }
 
+export interface TrimOptions {
+  /** Mark the backup taken first as kept, so retention never deletes it. */
+  keepBackup?: boolean
+}
+
 export class WorldService {
   private sleep: (ms: number) => Promise<void>
+  /** Servers with a trim preview or a trim under way, so two can't overlap. */
+  private trimming = new Set<string>()
 
   constructor(private deps: WorldDeps) {
     this.sleep = deps.sleep ?? ((ms) => Bun.sleep(ms))
@@ -329,5 +348,148 @@ export class WorldService {
       await this.deps.agent('service.start', { server: name })
       await this.deps.jobs.waitActive(name)
     }
+  }
+
+  private tool(): WorldTool {
+    if (!this.deps.worldTool) throw new WorldError("This panel can't trim worlds.")
+    return this.deps.worldTool
+  }
+
+  private async worldDir(name: string) {
+    const level = levelNameOf(await this.deps.readProperties(name))
+    const world = join(this.deps.serverDir(name), level)
+    if (!(await stat(join(world, 'level.dat')).catch(() => null))) {
+      throw new WorldError('There is no world to trim yet. Start the server once first.')
+    }
+    return world
+  }
+
+  private claimTrim(name: string) {
+    if (this.trimming.has(name)) {
+      throw new WorldError('This world is already being looked at or trimmed. Try again shortly.')
+    }
+    this.trimming.add(name)
+    return () => void this.trimming.delete(name)
+  }
+
+  /**
+   * What trimming with these rules would remove, as a read-only dry run. The server keeps
+   * running, so the figures can move a little before a real trim.
+   */
+  async trimPreview(name: string, rules: object): Promise<TrimPreview> {
+    this.row(name)
+    const world = await this.worldDir(name)
+    const release = this.claimTrim(name)
+    try {
+      const running = await this.isRunning(name)
+      const report = await runTrim(this.tool(), world, rules, { dryRun: true })
+      return { ...report, at: new Date().toISOString(), running }
+    } finally {
+      release()
+    }
+  }
+
+  /**
+   * Starts a job trimming unused chunks: free space, a safety backup, stop the server, trim,
+   * start it again. The caller has already checked a passkey. The web map redraws by itself,
+   * since it watches the region files.
+   */
+  trim(
+    name: string,
+    rules: object,
+    opts: TrimOptions = {},
+  ): { jobId: number; done: Promise<JobEvent> } {
+    this.row(name)
+    this.tool()
+    const releaseTrim = this.claimTrim(name)
+    let release: () => void
+    try {
+      release = this.deps.backups.lock(name)
+    } catch (err) {
+      releaseTrim()
+      throw err
+    }
+    const job = this.deps.jobs.track('world.trim', name, WORLD_TRIM_STEPS)
+    const link = `/servers/${name}/world#tools`
+    const done = this.runTrim(name, rules, !!opts.keepBackup, job)
+      .then((report) => {
+        const message = trimSummary(report)
+        this.deps.notify?.({
+          kind: 'world.trimmed',
+          server: name,
+          title: 'Unused chunks were trimmed',
+          detail: message,
+          severity: 'info',
+          link,
+        })
+        return job.succeed(message)
+      })
+      .catch((err) => job.fail(err))
+      .finally(() => {
+        release()
+        releaseTrim()
+      })
+    return { jobId: job.id, done }
+  }
+
+  private async runTrim(
+    name: string,
+    rules: object,
+    keepBackup: boolean,
+    job: JobTracker,
+  ): Promise<TrimReport> {
+    const world = await this.worldDir(name)
+
+    job.step(0)
+    await this.deps.backups.ensureSpace(world, await trimNeedBytes(world))
+
+    job.step(1, keepBackup ? 'Kept forever' : 'A copy of the world as it is now')
+    await this.deps.backups.snapshot(name, 'Before trimming unused chunks', { kept: keepBackup })
+
+    const wasRunning = await this.isRunning(name)
+    if (wasRunning) {
+      job.step(2)
+      await this.stop(name)
+    }
+    // The tool reads and writes the files itself, and doesn't check the server is stopped,
+    // so check once more right before it runs.
+    if (await this.isRunning(name)) {
+      throw new WorldError('The server is running again, so the world was left as it was.')
+    }
+
+    let report: TrimReport
+    try {
+      await this.deps.agent('server.permissions', { name }, { timeoutMs: 120_000 })
+      job.step(3)
+      let shown = 0
+      report = await runTrim(this.tool(), world, rules, {
+        dryRun: false,
+        onProgress: ({ done, total }) => {
+          // A step update per region file is too many; a few a second is plenty.
+          const now = Date.now()
+          if (done < total && now - shown < 500) return
+          shown = now
+          job.step(
+            3,
+            `${done.toLocaleString('en-GB')} of ${total.toLocaleString('en-GB')} region files`,
+          )
+        },
+      })
+      // New region files belong to the panel; give the server its access back.
+      await this.deps.agent('server.permissions', { name }, { timeoutMs: 120_000 })
+    } catch (err) {
+      if (wasRunning) await this.deps.agent('service.start', { server: name }).catch(() => {})
+      const why = err instanceof Error ? err.message : String(err)
+      throw new WorldError(
+        `Trimming stopped part way: ${why}. Each region file is swapped in whole, so the world still opens, and the backup taken first has it as it was.`,
+      )
+    }
+
+    if (wasRunning) {
+      job.step(4)
+      await this.deps.agent('service.start', { server: name })
+      await this.deps.jobs.waitActive(name)
+    }
+    return report
   }
 }
