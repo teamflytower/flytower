@@ -3,7 +3,7 @@ name: Review
 # The Flytower Code Reviewer: Claude reviews every pull request when it's opened or marked
 # ready for review, then each new push, posting as the Flytower Code Reviewer app. Each
 # review has inline comments and either comments or requests changes; it never approves.
-# A clean round dismisses the reviewer's own earlier requests for changes. After five
+# A clean round dismisses the reviewer's own earlier requests for changes. After three
 # rounds on one pull request it stops and leaves a note; start this workflow by hand with
 # the pull request's number for another round. Label a pull request no-review to skip it.
 #
@@ -29,7 +29,7 @@ on:
   workflow_dispatch:
     inputs:
       pr:
-        description: Pull request number to review now (also past the five-round limit)
+        description: Pull request number to review now (also past the three-round limit)
         required: true
 
 permissions:

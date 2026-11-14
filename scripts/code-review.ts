@@ -21,7 +21,7 @@ import { $ } from 'bun'
 import { appendFile, mkdir } from 'node:fs/promises'
 
 /** Automatic rounds per pull request before the reviewer stops and leaves it to people. */
-export const MAX_ROUNDS = 5
+export const MAX_ROUNDS = 3
 /** Marks the reviewer's own reviews and notes, so they can be told apart. */
 export const REVIEW_MARKER = '<!-- flytower-code-review -->'
 export const LIMIT_MARKER = '<!-- flytower-code-review-limit -->'
