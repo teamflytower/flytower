@@ -12,6 +12,7 @@ use flytower_agent::exec::{Exec, RealExec};
 use flytower_agent::fetch::Curl;
 use flytower_agent::handlers::{Agent, Context, system_clock};
 use flytower_agent::server::{ListenOptions, bind, serve};
+use flytower_agent::systemd::Bus;
 use flytower_agent::units::Paths;
 
 fn main() -> ExitCode {
@@ -30,6 +31,7 @@ fn main() -> ExitCode {
         }),
         arch: std::env::consts::ARCH.into(),
         events: None,
+        systemd: Arc::new(Bus::new()),
         paths: Paths::under(&root),
         panel_group: "flytower".into(),
         releases_url: String::new(),

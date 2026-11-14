@@ -47,12 +47,12 @@ fn status_of(server: &str, ctx: &Context) -> Value {
 }
 
 /// `service.events`: answers with every server's state, then sends `{server, status}` each
-/// time one changes. The journal says when a unit changed; a burst (exited, failed, restart
+/// time one changes. systemd says when a unit changed; a burst (exited, failed, restart
 /// scheduled) is collected for [`SETTLE`] and each server asked about once, and only real
-/// changes are sent. If the journal stops being followed, every server is asked about again.
+/// changes are sent. If systemd stops being followed, every server is asked about again.
 ///
 /// # Errors
-/// `failed` if this agent can't follow systemd's journal.
+/// `failed` if this agent can't follow systemd.
 pub fn service_events(
     servers: Vec<String>,
     ctx: &Arc<Context>,
@@ -140,53 +140,24 @@ pub fn service_events(
 mod tests {
     use super::*;
     use crate::events::{Follow, UnitEvents};
-    use crate::exec::{Exec, ExecResult};
-    use crate::handlers::testing::{Fake, TempRoot};
+    use crate::handlers::testing::{Fake, FakeSystemd, TempRoot};
     use crate::stream::Outbox;
     use std::sync::mpsc;
     use std::thread;
 
-    /// systemctl, with each server's `ActiveState` set by the test.
-    #[derive(Default)]
-    struct Systemd {
-        states: Mutex<BTreeMap<String, String>>,
-    }
-
-    impl Exec for Systemd {
-        fn run(&self, _file: &str, args: &[&str]) -> ExecResult {
-            let unit = args.get(1).copied().unwrap_or("");
-            let server = unit
-                .strip_prefix("flytower-mc@")
-                .and_then(|u| u.strip_suffix(".service"))
-                .unwrap_or("");
-            let state = lock(&self.states).get(server).cloned();
-            let stdout = match state {
-                None => "LoadState=not-found\n".to_string(),
-                Some(_) if args.iter().any(|a| a.contains("LoadState")) => "loaded\n".into(),
-                Some(state) => {
-                    format!("ActiveState={state}\nActiveEnterTimestamp=\nResult=success\n")
-                }
-            };
-            ExecResult {
-                stdout,
-                ..Default::default()
-            }
-        }
-    }
-
-    /// A journal the test feeds unit names into.
-    struct Journal {
+    /// systemd's signals, which the test feeds unit names into.
+    struct Changes {
         lines: Mutex<Option<mpsc::Receiver<String>>>,
     }
 
-    impl Follow for Journal {
-        fn run(&self, started: &mut dyn FnMut(), on_line: &mut dyn FnMut(&str)) {
+    impl Follow for Changes {
+        fn run(&self, started: &mut dyn FnMut(), on_unit: &mut dyn FnMut(&str)) {
             let Some(lines) = lock(&self.lines).take() else {
                 return;
             };
             started();
             while let Ok(unit) = lines.recv() {
-                on_line(&json!({ "UNIT": unit }).to_string());
+                on_unit(&unit);
             }
         }
         fn stop(&self) {}
@@ -195,12 +166,16 @@ mod tests {
     #[test]
     fn sends_each_real_change_once() {
         let root = TempRoot::new("service-events");
-        let systemd = Arc::new(Systemd::default());
-        lock(&systemd.states).insert("lobby".into(), "active".into());
-        lock(&systemd.states).insert("survival".into(), "inactive".into());
+        let systemd = FakeSystemd::with(&[
+            ("flytower-mc@lobby.service", &[("ActiveState", "active")]),
+            (
+                "flytower-mc@survival.service",
+                &[("ActiveState", "inactive")],
+            ),
+        ]);
         let (feed, lines) = mpsc::channel();
         let events = UnitEvents::new(
-            Arc::new(Journal {
+            Arc::new(Changes {
                 lines: Mutex::new(Some(lines)),
             }),
             Duration::from_mins(1),
@@ -210,7 +185,7 @@ mod tests {
             thread::yield_now();
         }
         let mut ctx = Fake::default().context(&root.paths);
-        ctx.exec = Arc::clone(&systemd) as Arc<dyn Exec>;
+        ctx.systemd = Arc::clone(&systemd) as Arc<dyn crate::systemd::Systemd>;
         ctx.events = Some(Arc::clone(&events));
         let ctx = Arc::new(ctx);
 
@@ -229,7 +204,7 @@ mod tests {
         feed.send("flytower-mc@survival.service".to_string())
             .unwrap();
         // A burst for one that did change: one event.
-        lock(&systemd.states).insert("survival".into(), "active".into());
+        systemd.set("flytower-mc@survival.service", &[("ActiveState", "active")]);
         for _ in 0..3 {
             feed.send("flytower-mc@survival.service".to_string())
                 .unwrap();
@@ -261,7 +236,7 @@ mod tests {
     }
 
     #[test]
-    fn says_so_without_the_journal() {
+    fn says_so_when_not_following() {
         let root = TempRoot::new("service-events-none");
         let ctx = Arc::new(Fake::default().context(&root.paths));
         let err = service_events(vec![], &ctx).err().unwrap();

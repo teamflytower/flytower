@@ -1,12 +1,9 @@
 //! Following systemd instead of asking it over and over.
-//! systemd (PID 1) writes a journal line for every change to a unit: started, main process
-//! exited, failed, restart scheduled, stopped. `journalctl --follow` hands those over as they
-//! are written, and `service.wait` holds a request open until one concerns a server the panel
-//! cares about.
+//! systemd signals every change to a unit (started, main process exited, failed, restart
+//! scheduled, stopped) on D-Bus as it happens (`crate::systemd::UnitChanges`), and
+//! `service.wait` holds a request open until one concerns a server the panel cares about.
 
 use std::collections::{BTreeSet, VecDeque};
-use std::io::{BufRead, BufReader, Read};
-use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 use std::thread;
@@ -14,13 +11,10 @@ use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
 
-/// The server a journal line (`journalctl -o json`) is about, if it's one of ours.
+/// The server a unit is, if it's one of ours.
 #[must_use]
-pub fn server_of_line(line: &str) -> Option<String> {
-    let entry: Value = serde_json::from_str(line).ok()?;
-    let name = entry
-        .get("UNIT")?
-        .as_str()?
+pub fn server_of_unit(unit: &str) -> Option<String> {
+    let name = unit
         .strip_prefix("flytower-mc@")?
         .strip_suffix(".service")?;
     let b = name.as_bytes();
@@ -31,57 +25,13 @@ pub fn server_of_line(line: &str) -> Option<String> {
     ok.then(|| name.to_string())
 }
 
-/// A source of journal lines.
+/// A source of unit changes.
 pub trait Follow: Send + Sync + 'static {
     /// Follows until the source ends. Calls `started` once it's running (not at all if it
-    /// can't start), then `on_line` per line.
-    fn run(&self, started: &mut dyn FnMut(), on_line: &mut dyn FnMut(&str));
-    /// Ends a `run` in progress.
+    /// can't start), then `on_unit` with the name of each unit that changed.
+    fn run(&self, started: &mut dyn FnMut(), on_unit: &mut dyn FnMut(&str));
+    /// Ends a `run` in progress, and any later one.
     fn stop(&self);
-}
-
-/// journalctl, following PID 1's messages from now on.
-#[derive(Default)]
-pub struct Journal {
-    child: Mutex<Option<Child>>,
-}
-
-impl Follow for Journal {
-    fn run(&self, started: &mut dyn FnMut(), on_line: &mut dyn FnMut(&str)) {
-        let child = Command::new("journalctl")
-            .args(["--follow", "--output=json", "--lines=0", "_PID=1"])
-            .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::null())
-            .spawn();
-        let Ok(mut child) = child else { return };
-        let Some(stdout) = child.stdout.take() else {
-            return;
-        };
-        *lock(&self.child) = Some(child);
-        started();
-        let mut reader = BufReader::new(stdout);
-        let mut line = Vec::new();
-        loop {
-            line.clear();
-            // Lines are small; a runaway one is cut off rather than kept.
-            match (&mut reader).take(1 << 20).read_until(b'\n', &mut line) {
-                Ok(0) | Err(_) => break,
-                Ok(_) => on_line(&String::from_utf8_lossy(&line)),
-            }
-        }
-        let child = lock(&self.child).take();
-        if let Some(mut child) = child {
-            let _ = child.kill();
-            let _ = child.wait();
-        }
-    }
-
-    fn stop(&self) {
-        if let Some(child) = lock(&self.child).as_mut() {
-            let _ = child.kill();
-        }
-    }
 }
 
 fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
@@ -96,13 +46,13 @@ pub const SETTLE: Duration = Duration::from_millis(300);
 /// What a listener hears about.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Change<'a> {
-    /// The journal says this server's unit changed.
+    /// systemd says this server's unit changed.
     Server(&'a str),
-    /// The journal stopped or started being followed, so changes may have gone unseen.
+    /// systemd stopped or started being followed, so changes may have gone unseen.
     Lost,
 }
 
-/// Called on the journal's thread for every change; it should only note it and return.
+/// Called on the following thread for every change; it should only note it and return.
 pub type Listener = Arc<dyn Fn(Change<'_>) + Send + Sync>;
 
 fn new_run() -> String {
@@ -153,7 +103,7 @@ impl State {
     }
 }
 
-/// Unit changes, as the journal reports them.
+/// Unit changes, as systemd reports them.
 pub struct UnitEvents {
     state: Mutex<State>,
     news: Condvar,
@@ -183,7 +133,7 @@ impl UnitEvents {
     }
 
     /// Follows on a thread of its own until [`stop`](Self::stop), starting again after
-    /// `retry` whenever the journal ends.
+    /// `retry` whenever following ends.
     pub fn start(self: &Arc<Self>) {
         let me = Arc::clone(self);
         thread::spawn(move || {
@@ -193,8 +143,8 @@ impl UnitEvents {
                         lock(&me.state).following = true;
                         me.tell(Change::Lost);
                     },
-                    &mut |line| {
-                        if let Some(server) = server_of_line(line) {
+                    &mut |unit| {
+                        if let Some(server) = server_of_unit(unit) {
                             me.push(&server);
                         }
                     },
@@ -299,7 +249,7 @@ mod tests {
     use super::*;
     use std::sync::mpsc;
 
-    /// A follower the test feeds lines into, and can make end.
+    /// A follower the test feeds unit names into, and can make end.
     struct Fake {
         lines: Mutex<Option<mpsc::Receiver<Option<String>>>>,
         send: Mutex<mpsc::Sender<Option<String>>>,
@@ -316,8 +266,7 @@ mod tests {
             })
         }
         fn line(&self, unit: &str) {
-            let line = json!({ "UNIT": unit, "MESSAGE": "Main process exited, code=killed, status=9/KILL" });
-            lock(&self.send).send(Some(line.to_string())).unwrap();
+            lock(&self.send).send(Some(unit.to_string())).unwrap();
         }
         fn exit(&self) {
             lock(&self.send).send(None).unwrap();
@@ -370,17 +319,14 @@ mod tests {
     }
 
     #[test]
-    fn reads_which_server_a_line_is_about() {
+    fn reads_which_server_a_unit_is() {
         assert_eq!(
-            server_of_line(r#"{"UNIT":"flytower-mc@survival.service"}"#).as_deref(),
+            server_of_unit("flytower-mc@survival.service").as_deref(),
             Some("survival")
         );
-        assert_eq!(server_of_line(r#"{"UNIT":"ssh.service"}"#), None);
-        assert_eq!(
-            server_of_line(r#"{"UNIT":"flytower-mc@../x.service"}"#),
-            None
-        );
-        assert_eq!(server_of_line("not json"), None);
+        assert_eq!(server_of_unit("ssh.service"), None);
+        assert_eq!(server_of_unit("flytower-mc@../x.service"), None);
+        assert_eq!(server_of_unit("flytower-mc@.service"), None);
     }
 
     #[test]
@@ -427,7 +373,7 @@ mod tests {
     }
 
     #[test]
-    fn says_everything_changed_when_the_journal_stops_then_follows_again() {
+    fn says_everything_changed_when_following_stops_then_follows_again() {
         let f = Fake::new();
         let ev = started(&f, 20 * MS);
         let a = vec!["a".to_string()];

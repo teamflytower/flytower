@@ -28,6 +28,7 @@ use crate::exec::Exec;
 use crate::fetch::Fetch;
 use crate::server::Service;
 use crate::stream::Stream;
+use crate::systemd::Systemd;
 use crate::units::Paths;
 use crate::verbs::{Params, SUBSCRIPTIONS, SubParams};
 
@@ -48,8 +49,10 @@ pub struct Context {
     pub fetch: Arc<dyn Fetch>,
     /// The CPU, as Rust names it: `x86_64` or `aarch64`.
     pub arch: String,
-    /// Unit changes from the journal; `None` makes `service.wait` tell the panel to poll.
+    /// Unit changes from systemd; `None` makes `service.wait` tell the panel to poll.
     pub events: Option<Arc<UnitEvents>>,
+    /// systemd itself, over D-Bus; tests use a fake.
+    pub systemd: Arc<dyn Systemd>,
     pub paths: Paths,
     /// The panel's group, which owns the agent's socket and shares server folders.
     pub panel_group: String,

@@ -357,6 +357,7 @@ mod tests {
             }),
             arch: std::env::consts::ARCH.into(),
             events: None,
+            systemd: Arc::new(crate::handlers::testing::FakeSystemd::default()),
             paths: root.paths.clone(),
             panel_group: "flytower".into(),
             releases_url: String::new(),

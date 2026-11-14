@@ -1,7 +1,4 @@
-//! Server services through systemd. For now this calls `systemctl`; talking to systemd over
-//! D-Bus may come later (#235), behind the same functions.
-
-use std::collections::BTreeMap;
+//! Server services through systemd, over D-Bus (`crate::systemd`), as systemctl would.
 
 use serde_json::{Value, json};
 
@@ -16,31 +13,31 @@ pub fn unit_name(server: &str) -> String {
 
 const ACTIVE_STATES: [&str; 5] = ["active", "inactive", "activating", "deactivating", "failed"];
 
-/// systemd prints this when it has no figure.
+/// systemd says this when it has no figure.
 const UNSET: &str = "18446744073709551615";
 
-fn systemctl(ctx: &Context, args: &[&str]) -> Result<String, AgentError> {
-    let r = ctx.exec.run("systemctl", args);
-    if r.code != 0 {
-        let stderr = r.stderr.trim();
-        let message = if stderr.is_empty() {
-            format!("systemctl {} failed", args.first().unwrap_or(&""))
-        } else {
-            stderr.to_string()
-        };
-        return Err(AgentError::new(ErrorCode::Failed, message));
-    }
-    Ok(r.stdout)
+const STATUS: [&str; 6] = [
+    "ActiveState",
+    "ActiveEnterTimestamp",
+    "Result",
+    "NRestarts",
+    "ExecMainCode",
+    "ExecMainStatus",
+];
+
+const USAGE: [&str; 3] = ["ActiveState", "CPUUsageNSec", "MemoryCurrent"];
+
+fn failed(message: String) -> AgentError {
+    AgentError::new(ErrorCode::Failed, message)
 }
 
-/// Refuse to act on a unit systemd has never heard of, rather than letting systemctl guess.
+/// Refuse to act on a unit systemd has never heard of, rather than letting it guess.
 fn assert_known(ctx: &Context, server: &str) -> Result<(), AgentError> {
-    let unit = unit_name(server);
-    let r = ctx.exec.run(
-        "systemctl",
-        &["show", &unit, "--property=LoadState", "--value"],
-    );
-    if r.stdout.trim() == "loaded" {
+    let props = ctx
+        .systemd
+        .show(&unit_name(server), &["LoadState"])
+        .map_err(failed)?;
+    if props.get("LoadState").is_some_and(|s| s == "loaded") {
         Ok(())
     } else {
         Err(AgentError::new(
@@ -48,26 +45,6 @@ fn assert_known(ctx: &Context, server: &str) -> Result<(), AgentError> {
             format!("no server called {server}"),
         ))
     }
-}
-
-/// Splits `systemctl show a b c` output into one property map per unit.
-#[must_use]
-pub fn parse_show(stdout: &str) -> Vec<BTreeMap<String, String>> {
-    let mut blocks = Vec::new();
-    let mut current = BTreeMap::new();
-    for line in stdout.lines() {
-        if line.trim().is_empty() {
-            if !current.is_empty() {
-                blocks.push(std::mem::take(&mut current));
-            }
-        } else if let Some((key, value)) = line.split_once('=') {
-            current.insert(key.to_string(), value.to_string());
-        }
-    }
-    if !current.is_empty() {
-        blocks.push(current);
-    }
-    blocks
 }
 
 fn int(v: Option<&String>) -> Option<u64> {
@@ -82,19 +59,13 @@ fn non_empty(v: Option<&String>) -> Option<&String> {
 /// `service.status`.
 ///
 /// # Errors
-/// `not_found` if systemd doesn't know the server.
+/// `not_found` if systemd doesn't know the server, `failed` if systemd can't be asked.
 pub fn status(server: &str, ctx: &Context) -> Result<Value, AgentError> {
     assert_known(ctx, server)?;
-    let unit = unit_name(server);
-    let r = ctx.exec.run(
-        "systemctl",
-        &[
-            "show",
-            &unit,
-            "--property=ActiveState,ActiveEnterTimestamp,Result,NRestarts,ExecMainCode,ExecMainStatus",
-        ],
-    );
-    let props = parse_show(&r.stdout).into_iter().next().unwrap_or_default();
+    let props = ctx
+        .systemd
+        .show(&unit_name(server), &STATUS)
+        .map_err(failed)?;
     let active = props
         .get("ActiveState")
         .map(String::as_str)
@@ -117,25 +88,20 @@ pub fn status(server: &str, ctx: &Context) -> Result<Value, AgentError> {
     }))
 }
 
-/// `service.usage`: CPU time and memory systemd has counted for each server.
+/// `service.usage`: CPU time and memory systemd has counted for each server. A server systemd
+/// can't be asked about is left out, as before.
+#[must_use]
 pub fn usage(servers: &[String], ctx: &Context) -> Value {
-    if servers.is_empty() {
-        return json!({ "usage": {} });
-    }
-    let units: BTreeMap<String, &String> = servers.iter().map(|s| (unit_name(s), s)).collect();
-    let mut args = vec!["show"];
-    args.extend(units.keys().map(String::as_str));
-    args.push("--property=Id,ActiveState,CPUUsageNSec,MemoryCurrent");
-    let r = ctx.exec.run("systemctl", &args);
     let figure = |v: Option<&String>| int(v.filter(|v| v.as_str() != UNSET));
     let mut out = serde_json::Map::new();
-    for props in parse_show(&r.stdout) {
-        let Some(server) = props.get("Id").and_then(|id| units.get(id)) else {
+    let servers: std::collections::BTreeSet<&String> = servers.iter().collect();
+    for server in servers {
+        let Ok(props) = ctx.systemd.show(&unit_name(server), &USAGE) else {
             continue;
         };
         let active = props.get("ActiveState").is_some_and(|s| s == "active");
         out.insert(
-            (*server).clone(),
+            server.clone(),
             json!({
                 "active": active,
                 "cpuNs": if active { figure(props.get("CPUUsageNSec")) } else { None },
@@ -146,7 +112,7 @@ pub fn usage(servers: &[String], ctx: &Context) -> Value {
     json!({ "usage": out })
 }
 
-/// `service.wait` when the journal isn't being followed: says so straight away, and the panel
+/// `service.wait` when systemd isn't being followed: says so straight away, and the panel
 /// polls instead.
 #[must_use]
 pub fn not_following(servers: &[String]) -> Value {
@@ -156,66 +122,49 @@ pub fn not_following(servers: &[String]) -> Value {
 /// `service.start`, `service.stop` and `service.restart`.
 ///
 /// # Errors
-/// `not_found` for an unknown server, `failed` if systemctl fails.
+/// `not_found` for an unknown server, `failed` if systemd refuses or the job fails.
 pub fn action(verb: &str, server: &str, ctx: &Context) -> Result<Value, AgentError> {
     assert_known(ctx, server)?;
     let unit = unit_name(server);
     // A server left stopped after a crash loop has hit its start limit, and systemd refuses
     // to start it until that is cleared. Starting it from the panel is the person saying so.
+    // A unit with nothing to clear answers with an error, which doesn't matter here.
     if verb != "stop" {
-        ctx.exec.run("systemctl", &["reset-failed", &unit]);
+        let _ = ctx.systemd.reset_failed(&unit);
     }
-    systemctl(ctx, &[verb, &unit])?;
+    ctx.systemd.job(verb, &unit).map_err(failed)?;
     Ok(json!({}))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::exec::ExecResult;
-    use crate::handlers::testing::{Fake, TempRoot};
+    use crate::handlers::testing::{FakeSystemd, TempRoot};
+    use std::sync::Arc;
 
-    fn result(stdout: &str) -> ExecResult {
-        ExecResult {
-            stdout: stdout.to_string(),
-            ..Default::default()
-        }
-    }
-
-    fn fake(answers: Vec<(&str, ExecResult)>) -> (Context, Fake) {
-        let fake = Fake::new(answers);
+    fn ctx(systemd: &Arc<FakeSystemd>) -> (Context, TempRoot) {
         let root = TempRoot::new("service");
-        (fake.context(&root.paths), fake)
+        let mut c = crate::handlers::testing::Fake::default().context(&root.paths);
+        c.systemd = Arc::clone(systemd) as Arc<dyn crate::systemd::Systemd>;
+        (c, root)
     }
 
-    fn ctx(answers: &[(&str, &str)]) -> (Context, Fake) {
-        fake(answers.iter().map(|(c, out)| (*c, result(out))).collect())
-    }
-
-    fn ran(fake: &Fake) -> Vec<String> {
-        fake.ran()
-    }
-
-    const KNOWN: &str = "systemctl show flytower-mc@survival.service --property=LoadState --value";
-    const STATUS: &str = "systemctl show flytower-mc@survival.service --property=ActiveState,ActiveEnterTimestamp,Result,NRestarts,ExecMainCode,ExecMainStatus";
-
-    #[test]
-    fn parses_show_output() {
-        let out = "Id=a\nActiveState=active\n\nId=b\nX=1=2\n\n";
-        let blocks = parse_show(out);
-        assert_eq!(blocks.len(), 2);
-        assert_eq!(blocks[1]["X"], "1=2");
-    }
+    const UNIT: &str = "flytower-mc@survival.service";
 
     #[test]
     fn reports_status() {
-        let (c, _) = ctx(&[
-            (KNOWN, "loaded\n"),
-            (
-                STATUS,
-                "ActiveState=failed\nActiveEnterTimestamp=Tue 2026-11-10 15:00:00 UTC\nResult=signal\nNRestarts=2\nExecMainCode=2\nExecMainStatus=9\n",
-            ),
-        ]);
+        let sd = FakeSystemd::with(&[(
+            UNIT,
+            &[
+                ("ActiveState", "failed"),
+                ("ActiveEnterTimestamp", "Tue 2026-11-10 15:00:00 UTC"),
+                ("Result", "signal"),
+                ("NRestarts", "2"),
+                ("ExecMainCode", "2"),
+                ("ExecMainStatus", "9"),
+            ],
+        )]);
+        let (c, _root) = ctx(&sd);
         let s = status("survival", &c).unwrap();
         assert_eq!(
             s,
@@ -226,13 +175,15 @@ mod tests {
 
     #[test]
     fn status_of_a_quiet_unit() {
-        let (c, _) = ctx(&[
-            (KNOWN, "loaded\n"),
-            (
-                STATUS,
-                "ActiveState=weird\nActiveEnterTimestamp=\nExecMainCode=0\n",
-            ),
-        ]);
+        let sd = FakeSystemd::with(&[(
+            UNIT,
+            &[
+                ("ActiveState", "weird"),
+                ("ActiveEnterTimestamp", ""),
+                ("ExecMainCode", "0"),
+            ],
+        )]);
+        let (c, _root) = ctx(&sd);
         let s = status("survival", &c).unwrap();
         assert_eq!(
             s,
@@ -243,7 +194,8 @@ mod tests {
 
     #[test]
     fn refuses_unknown_servers() {
-        let (c, r) = ctx(&[(KNOWN, "not-found\n")]);
+        let sd = FakeSystemd::with(&[]);
+        let (c, _root) = ctx(&sd);
         assert_eq!(
             status("survival", &c).unwrap_err().code,
             ErrorCode::NotFound
@@ -252,39 +204,36 @@ mod tests {
             action("start", "survival", &c).unwrap_err().code,
             ErrorCode::NotFound
         );
-        assert_eq!(ran(&r).len(), 2, "nothing else ran");
+        assert_eq!(
+            sd.ran(),
+            [
+                format!("show {UNIT} LoadState"),
+                format!("show {UNIT} LoadState")
+            ],
+            "nothing else ran"
+        );
     }
 
     #[test]
     fn starts_after_clearing_the_start_limit() {
-        let (c, r) = ctx(&[(KNOWN, "loaded\n")]);
+        let sd = FakeSystemd::with(&[(UNIT, &[])]);
+        let (c, _root) = ctx(&sd);
         action("start", "survival", &c).unwrap();
         assert_eq!(
-            ran(&r)[1..],
-            [
-                "systemctl reset-failed flytower-mc@survival.service",
-                "systemctl start flytower-mc@survival.service"
-            ]
+            sd.ran()[1..],
+            [format!("reset-failed {UNIT}"), format!("start {UNIT}")]
         );
-        let (c, r) = ctx(&[(KNOWN, "loaded\n")]);
+        let sd = FakeSystemd::with(&[(UNIT, &[])]);
+        let (c, _root) = ctx(&sd);
         action("stop", "survival", &c).unwrap();
-        assert_eq!(
-            ran(&r)[1..],
-            ["systemctl stop flytower-mc@survival.service"]
-        );
+        assert_eq!(sd.ran()[1..], [format!("stop {UNIT}")]);
     }
 
     #[test]
-    fn passes_systemctl_errors_on() {
-        let denied = ExecResult {
-            code: 1,
-            stderr: "Access denied\n".into(),
-            ..Default::default()
-        };
-        let (c, _) = fake(vec![
-            (KNOWN, result("loaded\n")),
-            ("systemctl stop flytower-mc@survival.service", denied),
-        ]);
+    fn passes_systemd_errors_on() {
+        let sd = FakeSystemd::with(&[(UNIT, &[])]);
+        sd.fail("stop", "Access denied");
+        let (c, _root) = ctx(&sd);
         let err = action("stop", "survival", &c).unwrap_err();
         assert_eq!(
             (err.code, err.message.as_str()),
@@ -294,12 +243,27 @@ mod tests {
 
     #[test]
     fn reports_usage() {
-        let cmd = "systemctl show flytower-mc@creative.service flytower-mc@survival.service --property=Id,ActiveState,CPUUsageNSec,MemoryCurrent";
-        let out = format!(
-            "Id=flytower-mc@survival.service\nActiveState=active\nCPUUsageNSec=1200\nMemoryCurrent={UNSET}\n\nId=flytower-mc@creative.service\nActiveState=inactive\nCPUUsageNSec=5\nMemoryCurrent=10\n\nId=other.service\nActiveState=active\n"
-        );
-        let (c, _) = ctx(&[(cmd, &out)]);
-        let u = usage(&["survival".into(), "creative".into()], &c);
+        let sd = FakeSystemd::with(&[
+            (
+                UNIT,
+                &[
+                    ("ActiveState", "active"),
+                    ("CPUUsageNSec", "1200"),
+                    ("MemoryCurrent", UNSET),
+                ],
+            ),
+            (
+                "flytower-mc@creative.service",
+                &[
+                    ("ActiveState", "inactive"),
+                    ("CPUUsageNSec", "5"),
+                    ("MemoryCurrent", "10"),
+                ],
+            ),
+        ]);
+        sd.fail("show flytower-mc@gone.service", "Connection refused");
+        let (c, _root) = ctx(&sd);
+        let u = usage(&["survival".into(), "creative".into(), "gone".into()], &c);
         assert_eq!(
             u,
             json!({ "usage": {
@@ -308,9 +272,10 @@ mod tests {
             } })
         );
         assert!(crate::verbs::check_result("service.usage", &u).is_ok());
-        let (none, r) = ctx(&[]);
-        assert_eq!(usage(&[], &none), json!({ "usage": {} }));
-        assert!(ran(&r).is_empty(), "no servers, no systemctl");
+        let none = FakeSystemd::with(&[]);
+        let (c, _root) = ctx(&none);
+        assert_eq!(usage(&[], &c), json!({ "usage": {} }));
+        assert!(none.ran().is_empty(), "no servers, no systemd");
     }
 
     #[test]
