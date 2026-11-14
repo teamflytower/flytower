@@ -99,10 +99,10 @@ export const verbs = {
     }),
   },
   /**
-   * Waits until a server changes state (systemd's journal says so), or `timeoutMs` passes, so
+   * Waits until a server changes state (systemd says so), or `timeoutMs` passes, so
    * the panel hears about crashes without polling. Pass back `cursor` as `after`. `servers`
    * is what comes back as changed when the agent can't tell, such as on the first call.
-   * `following` is false when the agent can't follow the journal; then poll instead.
+   * `following` is false when the agent can't follow systemd; then poll instead.
    */
   'service.wait': {
     params: z

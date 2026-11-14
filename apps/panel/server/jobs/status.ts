@@ -27,8 +27,8 @@ export type StatusEvents = (
 
 /**
  * Keeps an eye on every server's systemd state. With `follow`, it waits on the agent, which
- * answers when systemd's journal shows a server changing (and every five minutes regardless,
- * as a safety net), so nothing is polled. If the agent can't follow the journal, it falls
+ * answers when systemd says a server changed (and every five minutes regardless,
+ * as a safety net), so nothing is polled. If the agent can't follow systemd, it falls
  * back to asking every ten seconds. Without `follow` (in tests), it polls every few seconds
  * while someone is watching. Listeners get the full map on subscribe and on any change.
  */

@@ -1,4 +1,5 @@
-//! ISO 8601 times without a date crate: the audit log is the only user.
+//! Times without a date crate: ISO 8601 for the audit log, and systemd's own format for
+//! `service.status`, in the box's time zone.
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -68,6 +69,124 @@ fn civil(days: i64) -> (i64, i64, i64) {
     (y, m, d)
 }
 
+/// A time zone read from a `TZif` file (`/etc/localtime`): when each offset began, and the
+/// offsets with their abbreviations.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Zone {
+    transitions: Vec<(i64, usize)>,
+    types: Vec<(i64, String)>,
+}
+
+impl Zone {
+    /// UTC, for a box with no `/etc/localtime`.
+    #[must_use]
+    pub fn utc() -> Self {
+        Self {
+            transitions: Vec::new(),
+            types: vec![(0, "UTC".into())],
+        }
+    }
+
+    /// The box's zone, as systemctl uses it: `/etc/localtime`, or UTC without one.
+    #[must_use]
+    pub fn local() -> Self {
+        std::fs::read("/etc/localtime")
+            .ok()
+            .and_then(|b| Self::parse(&b))
+            .unwrap_or_else(Self::utc)
+    }
+
+    /// Reads a `TZif` file (RFC 8536), using the 64-bit block when there is one.
+    #[must_use]
+    pub fn parse(bytes: &[u8]) -> Option<Self> {
+        let header = |at: usize| -> Option<(u8, [usize; 6])> {
+            let h = bytes.get(at..at + 44)?;
+            if &h[..4] != b"TZif" {
+                return None;
+            }
+            let mut n = [0usize; 6];
+            for (i, c) in h[20..44].chunks(4).enumerate() {
+                n[i] = usize::try_from(u32::from_be_bytes(c.try_into().ok()?)).ok()?;
+            }
+            Some((h[4], n))
+        };
+        let (version, n) = header(0)?;
+        // isutcnt, isstdcnt, leapcnt, timecnt, typecnt, charcnt
+        let v1_len = n[3] * 5 + n[4] * 6 + n[5] + n[2] * 8 + n[1] + n[0];
+        let (at, n, size) = if version >= b'2' {
+            let at = 44 + v1_len;
+            (at + 44, header(at)?.1, 8)
+        } else {
+            (44, n, 4)
+        };
+        let [_, _, _, timecnt, typecnt, charcnt] = n;
+        let times = bytes.get(at..at + timecnt * size)?;
+        let idx = bytes.get(at + timecnt * size..at + timecnt * (size + 1))?;
+        let info_at = at + timecnt * (size + 1);
+        let infos = bytes.get(info_at..info_at + typecnt * 6)?;
+        let chars = bytes.get(info_at + typecnt * 6..info_at + typecnt * 6 + charcnt)?;
+        let transitions = times
+            .chunks(size)
+            .zip(idx)
+            .map(|(t, i)| {
+                let at = if size == 8 {
+                    i64::from_be_bytes(t.try_into().ok()?)
+                } else {
+                    i64::from(i32::from_be_bytes(t.try_into().ok()?))
+                };
+                Some((at, usize::from(*i)))
+            })
+            .collect::<Option<Vec<_>>>()?;
+        let types = infos
+            .chunks(6)
+            .map(|t| {
+                let offset = i64::from(i32::from_be_bytes(t[..4].try_into().ok()?));
+                let from = chars.get(usize::from(t[5])..)?;
+                let end = from.iter().position(|b| *b == 0).unwrap_or(from.len());
+                Some((offset, String::from_utf8_lossy(&from[..end]).into_owned()))
+            })
+            .collect::<Option<Vec<_>>>()?;
+        if types.is_empty() || transitions.iter().any(|(_, i)| *i >= types.len()) {
+            return None;
+        }
+        Some(Self { transitions, types })
+    }
+
+    /// The offset in seconds and the abbreviation in force at `secs` since the epoch.
+    fn at(&self, secs: i64) -> (i64, &str) {
+        let i = match self.transitions.partition_point(|(t, _)| *t <= secs) {
+            0 => 0,
+            n => self.transitions[n - 1].1,
+        };
+        let (offset, name) = &self.types[i];
+        (*offset, name)
+    }
+}
+
+/// A systemd timestamp (microseconds since the epoch) as `systemctl show` prints it:
+/// `Tue 2026-11-10 15:00:00 UTC`, in `zone`. Zero, systemd's "never", is empty.
+#[must_use]
+pub fn systemd(usec: u64, zone: &Zone) -> String {
+    if usec == 0 {
+        return String::new();
+    }
+    let secs = i64::try_from(usec / 1_000_000).unwrap_or(i64::MAX / 2);
+    let (offset, name) = zone.at(secs);
+    let local = secs + offset;
+    let days = local.div_euclid(86_400);
+    let rem = local.rem_euclid(86_400);
+    let (y, m, d) = civil(days);
+    // 1970-01-01 was a Thursday.
+    let weekday = ["Thu", "Fri", "Sat", "Sun", "Mon", "Tue", "Wed"]
+        [usize::try_from(days.rem_euclid(7)).unwrap_or(0)];
+    format!(
+        "{weekday} {y:04}-{m:02}-{d:02} {:02}:{:02}:{:02} {name}",
+        rem / 3600,
+        rem / 60 % 60,
+        rem % 60
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -104,5 +223,54 @@ mod tests {
         ] {
             assert_eq!(parse_iso(bad), None, "{bad}");
         }
+    }
+
+    #[test]
+    fn formats_like_systemctl() {
+        // 1794322800 is Tue 2026-11-10 15:00:00 UTC.
+        let usec = 1_794_322_800_000_000;
+        assert_eq!(systemd(usec, &Zone::utc()), "Tue 2026-11-10 15:00:00 UTC");
+        assert_eq!(systemd(0, &Zone::utc()), "");
+        assert_eq!(systemd(1, &Zone::utc()), "Thu 1970-01-01 00:00:00 UTC");
+    }
+
+    /// A hand-made `TZif` v2 file: London's switch to summer time on 29 March 2026.
+    fn london() -> Vec<u8> {
+        let mut b = Vec::new();
+        let header = |b: &mut Vec<u8>, timecnt: u32, typecnt: u32, charcnt: u32| {
+            b.extend_from_slice(b"TZif2");
+            b.extend_from_slice(&[0; 15]);
+            for n in [0, 0, 0, timecnt, typecnt, charcnt] {
+                b.extend_from_slice(&n.to_be_bytes());
+            }
+        };
+        // An empty v1 block, then the 64-bit one.
+        header(&mut b, 0, 1, 1);
+        b.extend_from_slice(&[0, 0, 0, 0, 0, 0, 0]);
+        header(&mut b, 1, 2, 9);
+        b.extend_from_slice(&1_774_746_000_i64.to_be_bytes());
+        b.push(1);
+        b.extend_from_slice(&0_i32.to_be_bytes());
+        b.extend_from_slice(&[0, 0]);
+        b.extend_from_slice(&3600_i32.to_be_bytes());
+        b.extend_from_slice(&[1, 4]);
+        b.extend_from_slice(b"GMT\0BST\0\0");
+        b
+    }
+
+    #[test]
+    fn follows_the_time_zone() {
+        let zone = Zone::parse(&london()).unwrap();
+        // Before the change, GMT; after it, BST, an hour ahead.
+        assert_eq!(
+            systemd(1_774_745_999_000_000, &zone),
+            "Sun 2026-03-29 00:59:59 GMT"
+        );
+        assert_eq!(
+            systemd(1_774_746_000_000_000, &zone),
+            "Sun 2026-03-29 02:00:00 BST"
+        );
+        assert_eq!(Zone::parse(b"not a zone"), None);
+        assert_eq!(Zone::parse(&london()[..60]), None);
     }
 }

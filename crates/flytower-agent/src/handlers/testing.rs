@@ -1,5 +1,5 @@
-//! Test helpers shared by the handler tests: a temporary box, and fakes for commands and
-//! downloads.
+//! Test helpers shared by the handler tests: a temporary box, and fakes for commands,
+//! downloads and systemd.
 #![allow(
     clippy::must_use_candidate,
     clippy::missing_panics_doc,
@@ -52,6 +52,7 @@ impl Fake {
             }),
             arch: std::env::consts::ARCH.into(),
             events: None,
+            systemd: Arc::new(FakeSystemd::default()),
             paths: paths.clone(),
             panel_group: "flytower".into(),
             releases_url: super::update::RELEASES.into(),
@@ -78,6 +79,95 @@ impl Exec for Fake {
             })
             .cloned()
             .unwrap_or_default()
+    }
+}
+
+/// systemd with a fixed set of units, each with the properties the test gives it. It records
+/// every call as "show unit Prop Prop", "reset-failed unit" or "start unit", and fails a call
+/// that starts with a prefix given to [`fail`](Self::fail).
+#[derive(Default)]
+pub struct FakeSystemd {
+    units: Mutex<BTreeMap<String, BTreeMap<String, String>>>,
+    failures: Mutex<Vec<(String, String)>>,
+    ran: Mutex<Vec<String>>,
+}
+
+impl FakeSystemd {
+    pub fn with(units: &[(&str, &[(&str, &str)])]) -> Arc<Self> {
+        let me = Self::default();
+        for (unit, props) in units {
+            me.set(unit, props);
+        }
+        Arc::new(me)
+    }
+
+    /// Adds or changes a unit's properties.
+    pub fn set(&self, unit: &str, props: &[(&str, &str)]) {
+        let mut entry = BTreeMap::from([
+            ("Id".to_string(), unit.to_string()),
+            ("LoadState".to_string(), "loaded".to_string()),
+        ]);
+        for (k, v) in props {
+            entry.insert((*k).to_string(), (*v).to_string());
+        }
+        self.units
+            .lock()
+            .unwrap()
+            .entry(unit.to_string())
+            .or_default()
+            .extend(entry);
+    }
+
+    pub fn fail(&self, prefix: &str, message: &str) {
+        self.failures
+            .lock()
+            .unwrap()
+            .push((prefix.to_string(), message.to_string()));
+    }
+
+    pub fn ran(&self) -> Vec<String> {
+        self.ran.lock().unwrap().clone()
+    }
+
+    fn call(&self, call: String) -> Result<(), String> {
+        let failure = self
+            .failures
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|(prefix, _)| call.starts_with(prefix.as_str()))
+            .map(|(_, m)| m.clone());
+        self.ran.lock().unwrap().push(call);
+        failure.map_or(Ok(()), Err)
+    }
+}
+
+impl crate::systemd::Systemd for FakeSystemd {
+    fn show(&self, unit: &str, properties: &[&str]) -> Result<BTreeMap<String, String>, String> {
+        self.call(format!("show {unit} {}", properties.join(" ")))?;
+        let known = self.units.lock().unwrap().get(unit).cloned();
+        let known = known.as_ref();
+        Ok(properties
+            .iter()
+            .map(|p| {
+                let v = match (known, *p) {
+                    (Some(u), p) => u.get(p).cloned().unwrap_or_default(),
+                    (None, "LoadState") => "not-found".into(),
+                    (None, "ActiveState") => "inactive".into(),
+                    (None, "Id") => unit.into(),
+                    (None, _) => String::new(),
+                };
+                ((*p).to_string(), v)
+            })
+            .collect())
+    }
+
+    fn reset_failed(&self, unit: &str) -> Result<(), String> {
+        self.call(format!("reset-failed {unit}"))
+    }
+
+    fn job(&self, verb: &str, unit: &str) -> Result<(), String> {
+        self.call(format!("{verb} {unit}"))
     }
 }
 

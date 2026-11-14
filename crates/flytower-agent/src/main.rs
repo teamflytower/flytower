@@ -6,12 +6,13 @@ use std::process::ExitCode;
 use std::sync::Arc;
 use std::time::Duration;
 
-use flytower_agent::events::{Journal, UnitEvents};
+use flytower_agent::events::UnitEvents;
 use flytower_agent::exec::{Exec, RealExec};
 use flytower_agent::fetch::Curl;
 use flytower_agent::handlers::{Agent, Context, router, server, ssh, system_clock, update};
 use flytower_agent::release::RELEASE_KEY;
 use flytower_agent::server::{ListenOptions, bind, group_id, serve, user_id};
+use flytower_agent::systemd::{Bus, UnitChanges};
 use flytower_agent::units::Paths;
 use flytower_agent::{caddy, folders};
 
@@ -25,7 +26,7 @@ fn main() -> ExitCode {
         return ExitCode::FAILURE;
     }
     let exec: Arc<dyn Exec> = Arc::new(RealExec::default());
-    let events = UnitEvents::new(Arc::new(Journal::default()), Duration::from_secs(5));
+    let events = UnitEvents::new(Arc::new(UnitChanges::default()), Duration::from_secs(5));
     events.start();
     let ctx = Context {
         version: env("FLYTOWER_VERSION", "0.0.0-dev"),
@@ -36,6 +37,7 @@ fn main() -> ExitCode {
         }),
         arch: std::env::consts::ARCH.into(),
         events: Some(events),
+        systemd: Arc::new(Bus::new()),
         paths: Paths::from_env(),
         panel_group: env("FLYTOWER_PANEL_GROUP", "flytower"),
         releases_url: env("FLYTOWER_RELEASES_URL", update::RELEASES),

@@ -19,6 +19,9 @@ It says `flytower-agent <version> (rust) listening`. `readlink -f /proc/$(system
 - [ ] **System**: the agent shows as connected, with the same version as the panel.
 - [ ] **Start**, **Stop** and **Restart** a server. The status changes straight away, with no refresh.
 - [ ] Stop the server from SSH (`systemctl stop flytower-mc@<name>`). The panel notices within a few seconds.
+- [ ] The agent talks to systemd over D-Bus, not by running `systemctl`: while you start and stop a server from the panel, `ps -ef | grep '[s]ystemctl'` shows nothing from the agent.
+- [ ] Kill a running server (`systemctl kill -s KILL flytower-mc@<name>`). The crash shows within a few seconds, with the signal as its cause.
+- [ ] `systemctl restart flytower-agent` while a server is running. The panel reconnects, the status is still right, and the server keeps running.
 - [ ] Create a new server on a Java version you haven't used yet. Java downloads and the server starts.
 - [ ] Change a server's memory and port in **Settings**, then restart it. Both take effect.
 - [ ] **System**, **SSH**: open SSH for 5 minutes, check you can connect, then let it close by itself. Restart the agent while it's open and check it still closes on time.
@@ -32,5 +35,11 @@ printf '{"id":"1","verb":"agent.hello","params":{}}\n' | nc -U -q1 /run/flytower
 ```
 
 - [ ] The answer has `"kind":"rust"` and `"protocols":[1,2]`.
+- [ ] `service.status` gives the same start time as systemd, in the box's time zone:
+
+```sh
+printf '{"id":"1","verb":"service.status","params":{"server":"<name>"}}\n' | nc -U -q1 /run/flytower/agent.sock
+systemctl show -p ActiveEnterTimestamp --value flytower-mc@<name>
+```
 
 If anything goes wrong, send `journalctl -u flytower-agent -n 100`.

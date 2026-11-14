@@ -10,7 +10,7 @@ Flytower notices when a server crashes, tells you why, and stops a server that k
 
 ## What happens when a server crashes
 
-Flytower follows systemd's journal (through its system helper), so it hears about a crash, or a server started or stopped with `systemctl`, as it happens, without checking over and over. As a safety net it also looks at every server every five minutes. If the journal can't be followed, it falls back to checking every ten seconds.
+Flytower follows systemd (through its system helper, which listens to systemd's own signals), so it hears about a crash, or a server started or stopped with `systemctl`, as it happens, without checking over and over. As a safety net it also looks at every server every five minutes. If systemd can't be followed, it falls back to checking every ten seconds.
 
 1. systemd restarts it after 15 seconds. On newer systems (systemd 254 or later, such as Ubuntu 24.04) the wait grows with each crash, up to a minute.
 2. Flytower records the crash with its cause, a link to Minecraft's crash report if one was written, and the last 50 lines of the log (which would otherwise be lost when the server starts again).
