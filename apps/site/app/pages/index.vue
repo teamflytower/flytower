@@ -32,7 +32,7 @@ const comparison = [
       class="border-b border-default bg-[radial-gradient(ellipse_55%_70%_at_85%_10%,color-mix(in_oklab,var(--ui-primary)_10%,transparent),transparent_70%)]"
     >
       <UContainer
-        class="grid items-center gap-12 pt-16 lg:gap-16 pb-20 sm:pt-20 lg:grid-cols-[1fr_1.25fr] lg:pb-28"
+        class="grid items-center gap-12 pt-16 lg:gap-16 pb-20 sm:pt-20 lg:grid-cols-[1fr_1.15fr] lg:pb-28"
       >
         <div class="flex min-w-0 flex-col gap-6">
           <ULink
@@ -63,7 +63,7 @@ const comparison = [
           </div>
         </div>
 
-        <div class="relative min-w-0 pb-10 sm:pb-16 xl:-mr-40">
+        <div class="relative min-w-0 pr-3 pb-20 sm:pr-6 sm:pb-28">
           <div
             class="overflow-hidden rounded-xl border border-accented bg-default shadow-[0_40px_120px_rgba(0,0,0,0.45)]"
           >
@@ -80,20 +80,20 @@ const comparison = [
               src="/home/servers-dark.webp"
               alt="Flytower's server list, with Survival and Creative running and Events stopped"
               width="1440"
-              height="560"
-              class="block aspect-[1440/560] w-full object-cover object-top-left"
+              height="900"
+              class="block h-auto w-full"
               fetchpriority="high"
             />
           </div>
           <div
-            class="absolute bottom-0 -left-3 w-3/5 overflow-hidden rounded-xl border border-accented shadow-[0_30px_80px_rgba(0,0,0,0.55)] sm:-left-6"
+            class="absolute right-0 bottom-0 w-[56%] overflow-hidden rounded-xl border border-accented shadow-[0_30px_80px_rgba(0,0,0,0.55)]"
           >
             <img
               src="/home/console-dark.webp"
               alt="Survival's console, with players joining and chatting"
               width="1440"
-              height="640"
-              class="block aspect-[1440/640] w-full object-cover object-top-left"
+              height="900"
+              class="block h-auto w-full"
             />
           </div>
         </div>
