@@ -18,17 +18,18 @@ pub mod chunk;
 pub mod colours;
 pub mod draw;
 pub mod jar;
-pub mod nbt;
 pub mod palette;
-pub mod region;
 pub mod render;
 pub mod tiles;
 pub mod world;
 
+// Shared with `flytower-world`; re-exported so paths like `flytower_map::region` still work.
+pub use flytower_anvil::{nbt, region};
+
 use std::fmt::Write as _;
 use std::path::Path;
 
-use world::Dimension;
+use world::{Dimension, MapDimension};
 
 /// The `maps.json` format. Bump it if a field changes meaning.
 pub const MANIFEST: u32 = 1;

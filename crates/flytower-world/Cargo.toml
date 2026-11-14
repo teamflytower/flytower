@@ -1,0 +1,17 @@
+[package]
+name = "flytower-world"
+description = "World tools for the Flytower panel: trims chunks nobody uses from a Minecraft world, from outside the server."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+flytower-anvil = { path = "../flytower-anvil" }
+serde_json = { version = "1.0.154", features = ["preserve_order"] }
+
+[dev-dependencies]
+flate2 = "1.1.11"
+
+[lints]
+workspace = true

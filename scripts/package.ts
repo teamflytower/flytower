@@ -76,7 +76,13 @@ await $`cargo build --release --locked --target ${rustTarget}`.cwd(crates)
 // systemd and the agent start bin/flytower-agent and bin/flytower-updater by these paths,
 // whatever is behind them (docs/decisions/0001-rust-and-go.md). Since 1.5.0 that is the Rust
 // programs themselves: no wrapper, no Bun fallback.
-for (const bin of ['flytower-du', 'flytower-agent', 'flytower-updater', 'flytower-map']) {
+for (const bin of [
+  'flytower-du',
+  'flytower-agent',
+  'flytower-updater',
+  'flytower-map',
+  'flytower-world',
+]) {
   await cp(join(crates, 'target', rustTarget, 'release', bin), join(stage, 'bin', bin))
   await chmod(join(stage, 'bin', bin), 0o755)
 }
