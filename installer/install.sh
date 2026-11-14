@@ -338,6 +338,23 @@ chmod 0640 "$env_file.new"
 mv "$env_file.new" "$env_file"
 umask 022
 
+# ---------------------------------------------------------------- D-Bus
+
+# The agent talks to systemd over the D-Bus system bus, as most tools do. Minimal images
+# (Debian containers, say) can come without a bus daemon; systemctl gets by without one, but
+# the agent can't.
+if ! systemctl is-active --quiet dbus.socket && ! systemctl is-active --quiet dbus.service; then
+  if ! command -v dbus-daemon >/dev/null && ! command -v dbus-broker >/dev/null; then
+    say "Installing D-Bus"
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update -qq
+    apt-get install -y -qq dbus >/dev/null
+  fi
+  systemctl start dbus.socket 2>/dev/null || true
+  systemctl start dbus.service ||
+    die "couldn't start the D-Bus system bus, which the agent needs to talk to systemd"
+fi
+
 # ---------------------------------------------------------------- systemd
 
 # Newer releases start the agent by a stable path (bin/flytower-agent), so a later release
