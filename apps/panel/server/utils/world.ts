@@ -48,6 +48,7 @@ export function useWorld(): WorldService {
     worldTool: runWorldTool,
     notify: (e) => useNotify().notify(e),
     trimPreviews: useTrimPreviews(),
+    publish: (topic, message) => useJobs().bus.publish(topic, message),
   })
   return service
 }

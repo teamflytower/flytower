@@ -12,7 +12,12 @@ import {
   WORLD_TRIM_STEPS,
   type JobEvent,
 } from '../../shared/utils/jobs'
-import { trimTotals, type TrimPreview, type TrimReport } from '../../shared/trim-report'
+import {
+  trimTotals,
+  type TrimPreview,
+  type TrimPreviewState,
+  type TrimReport,
+} from '../../shared/trim-report'
 import type { NotifyEvent } from '../notify/types'
 import { folderBytes } from '../backups/service'
 import { copyFolder } from '../clone'
@@ -53,7 +58,12 @@ export interface WorldDeps {
   notify?: (e: NotifyEvent) => void
   /** Where previews' chunk maps are kept for the web map's overlay. */
   trimPreviews?: Pick<TrimPreviews, 'save' | 'clear'>
+  /** Sends a trim preview's progress and result to `trim:<name>`. */
+  publish?: (topic: string, message: unknown) => void
 }
+
+/** How often a running preview says how far it has got. */
+const PREVIEW_PROGRESS_MS = 500
 
 export interface PregenStatus {
   /** Why pre-generation can't run here, if it can't. */
@@ -82,6 +92,10 @@ export class WorldService {
   private sleep: (ms: number) => Promise<void>
   /** Servers with a trim preview or a trim under way, so two can't overlap. */
   private trimming = new Set<string>()
+  /** Each server's latest trim preview, and the one under way. */
+  private previews = new Map<string, TrimPreviewState>()
+  private previewRuns = new Map<string, Promise<TrimPreview>>()
+  private nextRun = 1
 
   constructor(private deps: WorldDeps) {
     this.sleep = deps.sleep ?? ((ms) => Bun.sleep(ms))
@@ -374,29 +388,79 @@ export class WorldService {
     return () => void this.trimming.delete(name)
   }
 
+  /** Where this server's trim preview is. */
+  trimPreviewState(name: string): TrimPreviewState {
+    return this.previews.get(name) ?? { state: 'idle' }
+  }
+
+  private setPreview(name: string, state: TrimPreviewState) {
+    this.previews.set(name, state)
+    this.deps.publish?.(`trim:${name}`, state)
+  }
+
   /**
-   * What trimming with these rules would remove, as a read-only dry run. The server keeps
-   * running, so the figures can move a little before a real trim.
+   * Starts a read-only dry run of trimming with these rules, in the background: a big world
+   * takes minutes, far longer than a request can wait. Progress and the result go to
+   * `trim:<name>`. The server keeps running, so the figures can move a little before a real
+   * trim. Asking again while one with the same rules is running joins it.
    */
-  async trimPreview(name: string, rules: object): Promise<TrimPreview> {
+  async startTrimPreview(name: string, rules: object): Promise<TrimPreviewState> {
     this.row(name)
-    const world = await this.worldDir(name)
-    const release = this.claimTrim(name)
-    try {
-      const running = await this.isRunning(name)
-      const { bitmap, ...report } = await runTrim(this.tool(), world, rules, {
-        dryRun: true,
-        bitmap: !!this.deps.trimPreviews,
-      })
-      const at = new Date().toISOString()
-      if (bitmap) {
-        const removed = trimTotals(report).removed
-        await this.deps.trimPreviews!.save(name, { at, rules, removed, bitmap })
-      }
-      return { ...report, at, running }
-    } finally {
-      release()
+    const current = this.previews.get(name)
+    if (current?.state === 'running' && JSON.stringify(current.rules) === JSON.stringify(rules)) {
+      return current
     }
+    const world = await this.worldDir(name)
+    const tool = this.tool()
+    const release = this.claimTrim(name)
+    const run = this.nextRun++
+    this.setPreview(name, { state: 'running', run, rules, done: 0, total: 0 })
+    let last = 0
+    const onProgress = ({ done, total }: { done: number; total: number }) => {
+      const now = Date.now()
+      if (now - last < PREVIEW_PROGRESS_MS && done < total) return
+      last = now
+      this.setPreview(name, { state: 'running', run, rules, done, total })
+    }
+    const work = (async () => {
+      try {
+        const running = await this.isRunning(name)
+        const { bitmap, ...report } = await runTrim(tool, world, rules, {
+          dryRun: true,
+          bitmap: !!this.deps.trimPreviews,
+          onProgress,
+        })
+        const at = new Date().toISOString()
+        if (bitmap) {
+          const removed = trimTotals(report).removed
+          await this.deps.trimPreviews!.save(name, { at, rules, removed, bitmap })
+        }
+        const preview: TrimPreview = { ...report, at, running }
+        this.setPreview(name, { state: 'done', run, rules, preview })
+        return preview
+      } catch (err) {
+        const error = err instanceof Error ? err.message : String(err)
+        this.setPreview(name, { state: 'failed', run, rules, error })
+        throw err
+      } finally {
+        release()
+        this.previewRuns.delete(name)
+      }
+    })()
+    // Whoever started it hears through `trim:<name>`; this only stops an unhandled rejection.
+    work.catch(() => {})
+    this.previewRuns.set(name, work)
+    return this.previews.get(name)!
+  }
+
+  /** A trim preview, waited for: starts one, or joins the one under way. */
+  async trimPreview(name: string, rules: object): Promise<TrimPreview> {
+    await this.startTrimPreview(name, rules)
+    const work = this.previewRuns.get(name)
+    if (work) return work
+    const state = this.trimPreviewState(name)
+    if (state.state === 'done') return state.preview
+    throw new WorldError(state.state === 'failed' ? state.error : 'The preview stopped.')
   }
 
   /**

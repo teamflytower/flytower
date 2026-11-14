@@ -4,7 +4,12 @@
  * ones, then a trim after a passkey check: backup, stop, trim, start.
  */
 import type { TrimRules } from '#shared/trim-rules'
-import { dimensionName, trimTotals, type TrimPreview } from '#shared/trim-report'
+import {
+  dimensionName,
+  trimTotals,
+  type TrimPreview,
+  type TrimPreviewState,
+} from '#shared/trim-report'
 
 const { server } = useServerContext()
 const route = useRoute()
@@ -31,20 +36,56 @@ const totals = computed(() => (preview.value ? trimTotals(preview.value) : null)
 const count = (n: number) => n.toLocaleString()
 const plural = (n: number, one: string, many: string) => `${count(n)} ${n === 1 ? one : many}`
 
+/** The preview this dialog asked for: a big world takes minutes, so it runs in the background. */
+const run = ref<number | null>(null)
+const progress = ref<{ done: number; total: number } | null>(null)
+/** The latest word from the topic, which can come before the request that started it returns. */
+let latest: TrimPreviewState | null = null
+
+function apply(s: TrimPreviewState) {
+  if (s.state === 'idle' || s.run !== run.value) return
+  if (s.state === 'running') {
+    progress.value = s.total ? { done: s.done, total: s.total } : null
+    return
+  }
+  previewing.value = false
+  if (s.state === 'done') {
+    preview.value = s.preview
+  } else {
+    preview.value = null
+    previewError.value = s.error
+  }
+}
+
+useTopic<TrimPreviewState>(
+  () => (open.value && name.value ? `trim:${name.value}` : null),
+  (s) => {
+    latest = s
+    apply(s)
+  },
+)
+
 async function runPreview() {
   previewing.value = true
   previewError.value = null
+  progress.value = null
+  run.value = null
   try {
-    const r = await $fetch<{ rules: TrimRules; preview: TrimPreview }>(
+    const r = await $fetch<{ rules: TrimRules; state: TrimPreviewState }>(
       `/api/servers/${name.value}/world/trim-preview` as string,
       { method: 'POST' },
     )
-    preview.value = r.preview
+    if (r.state.state === 'idle') throw new Error('The preview never started. Try again.')
+    run.value = r.state.run
     previewRules.value = r.rules
+    apply(
+      latest?.state !== 'idle' && latest?.run === r.state.run && latest.state !== 'running'
+        ? latest
+        : r.state,
+    )
   } catch (err) {
     preview.value = null
     previewError.value = errorMessage(err)
-  } finally {
     previewing.value = false
   }
 }
@@ -144,8 +185,11 @@ async function trim() {
             <div>
               <p class="font-medium">Looking at every chunk…</p>
               <p class="text-muted">
-                Nothing is changed and the server keeps running. This takes a few seconds, or a
-                minute or two on a big world.
+                Nothing is changed and the server keeps running. This takes a few seconds, or
+                several minutes on a big world. You can close this and come back.
+              </p>
+              <p v-if="progress" class="mt-1 text-muted tabular-nums" data-e2e="trim-progress">
+                {{ count(progress.done) }} of {{ count(progress.total) }} region files looked at
               </p>
             </div>
           </div>

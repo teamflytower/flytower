@@ -116,3 +116,13 @@ export function parseTrimReport(out: string): TrimReport {
     ms: num(parsed.ms),
   }
 }
+
+/**
+ * Where a server's trim preview is, as the `trim:<name>` topic sends it. A preview runs in
+ * the background, since a big world takes minutes; `run` tells one preview from the next.
+ */
+export type TrimPreviewState =
+  | { state: 'idle' }
+  | { state: 'running'; run: number; rules: unknown; done: number; total: number }
+  | { state: 'done'; run: number; rules: unknown; preview: TrimPreview }
+  | { state: 'failed'; run: number; rules: unknown; error: string }
