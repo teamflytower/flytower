@@ -48,6 +48,25 @@ impl Tag {
         }
     }
 
+    /// A whole number of any width.
+    #[must_use]
+    pub fn as_i64(&self) -> Option<i64> {
+        match *self {
+            Self::Long(n) => Some(n),
+            _ => self.as_i32().map(i64::from),
+        }
+    }
+
+    /// Any number, as a float.
+    #[must_use]
+    pub fn as_f64(&self) -> Option<f64> {
+        match *self {
+            Self::Float(n) => Some(n.into()),
+            Self::Double(n) => Some(n),
+            _ => self.as_i32().map(f64::from),
+        }
+    }
+
     #[must_use]
     pub fn as_str(&self) -> Option<&str> {
         match self {
@@ -60,6 +79,14 @@ impl Tag {
     pub fn as_list(&self) -> Option<&[Self]> {
         match self {
             Self::List(items) => Some(items),
+            _ => None,
+        }
+    }
+
+    #[must_use]
+    pub fn as_ints(&self) -> Option<&[i32]> {
+        match self {
+            Self::IntArray(ints) => Some(ints),
             _ => None,
         }
     }
@@ -97,6 +124,52 @@ pub fn parse(bytes: &[u8]) -> Result<Tag, Error> {
     }
     r.string()?;
     r.payload(10, 0)
+}
+
+/// Reads only the named fields of a root compound, skipping everything else without
+/// building it. Much cheaper than [`parse`] when a chunk's few top-level numbers are all you
+/// need. Fields come back in the order they're stored; missing ones are left out.
+///
+/// # Errors
+///
+/// As [`parse`]: skipped fields are checked just as carefully.
+pub fn fields(bytes: &[u8], wanted: &[&str]) -> Result<Vec<(String, Tag)>, Error> {
+    let mut r = Reader { bytes, pos: 0 };
+    if r.u8()? != 10 {
+        return Err(Error("the root isn't a compound"));
+    }
+    r.string()?;
+    let mut out = Vec::new();
+    loop {
+        let kind = r.u8()?;
+        if kind == 0 {
+            return Ok(out);
+        }
+        let name = r.string()?;
+        if wanted.contains(&name.as_str()) {
+            let value = r.payload(kind, 1)?;
+            out.push((name, value));
+        } else {
+            r.skip(kind, 1)?;
+        }
+    }
+}
+
+/// Reads a whole `.dat` file such as `level.dat`: gzipped NBT as Minecraft writes them,
+/// though zlib and uncompressed files read too.
+///
+/// # Errors
+///
+/// When the file can't be read, won't decompress, or isn't NBT.
+pub fn read_dat(path: &std::path::Path) -> Result<Tag, String> {
+    let raw = std::fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    let bytes = match raw.first() {
+        Some(0x1f) => crate::region::decompress(1, &raw),
+        Some(0x78) => crate::region::decompress(2, &raw),
+        _ => Ok(raw),
+    }
+    .map_err(|e| format!("{}: {e}", path.display()))?;
+    parse(&bytes).map_err(|e| format!("{}: {e}", path.display()))
 }
 
 struct Reader<'a> {
@@ -147,6 +220,55 @@ impl Reader<'_> {
         // Java's modified UTF-8 only differs for NUL and characters outside the BMP, which
         // block and biome names never use.
         Ok(String::from_utf8_lossy(self.take(n.into())?).into_owned())
+    }
+
+    /// Moves past one payload without keeping it, with the same checks as [`Self::payload`].
+    fn skip(&mut self, kind: u8, depth: usize) -> Result<(), Error> {
+        if depth > MAX_DEPTH {
+            return Err(Error("nested too deeply"));
+        }
+        match kind {
+            1..=6 => {
+                self.take(min_size(kind))?;
+            }
+            7 => {
+                let n = self.len(1)?;
+                self.take(n)?;
+            }
+            8 => {
+                let n = u16::from_be_bytes(self.array()?);
+                self.take(n.into())?;
+            }
+            9 => {
+                let item = self.u8()?;
+                let n = self.len(min_size(item))?;
+                if item == 0 && n > 0 {
+                    return Err(Error("a list of nothing with items"));
+                }
+                for _ in 0..n {
+                    self.skip(item, depth + 1)?;
+                }
+            }
+            10 => loop {
+                let field = self.u8()?;
+                if field == 0 {
+                    break;
+                }
+                let n = u16::from_be_bytes(self.array()?);
+                self.take(n.into())?;
+                self.skip(field, depth + 1)?;
+            },
+            11 => {
+                let n = self.len(4)?;
+                self.take(n * 4)?;
+            }
+            12 => {
+                let n = self.len(8)?;
+                self.take(n * 8)?;
+            }
+            _ => return Err(Error("unknown tag type")),
+        }
+        Ok(())
     }
 
     fn payload(&mut self, kind: u8, depth: usize) -> Result<Tag, Error> {
@@ -247,6 +369,37 @@ mod tests {
     }
 
     #[test]
+    fn reads_only_the_fields_asked_for() {
+        // {"": {"big": [[1, 2], [3]], "n": 7L, "s": "x", "c": {"d": 1.5d}}}
+        let mut b = vec![10, 0, 0];
+        b.extend([9, 0, 3, b'b', b'i', b'g', 11, 0, 0, 0, 2]);
+        b.extend([0, 0, 0, 2, 0, 0, 0, 1, 0, 0, 0, 2]);
+        b.extend([0, 0, 0, 1, 0, 0, 0, 3]);
+        b.extend([4, 0, 1, b'n']);
+        b.extend(7i64.to_be_bytes());
+        b.extend([8, 0, 1, b's', 0, 1, b'x']);
+        b.extend([10, 0, 1, b'c', 6, 0, 1, b'd']);
+        b.extend(1.5f64.to_be_bytes());
+        b.extend([0, 0]);
+        let got = fields(&b, &["n", "c", "missing"]).unwrap();
+        assert_eq!(got.len(), 2);
+        assert_eq!(got[0].0, "n");
+        assert_eq!(got[0].1.as_i64(), Some(7));
+        assert_eq!(got[1].1.get("d").and_then(Tag::as_f64), Some(1.5));
+        // The whole tree reads the same way.
+        let tag = parse(&b).unwrap();
+        assert_eq!(
+            tag.get("big").and_then(Tag::as_list).map(<[Tag]>::len),
+            Some(2)
+        );
+        assert_eq!(tag.get("s").and_then(Tag::as_str), Some("x"));
+        // Cut anywhere, it's an error, never a panic.
+        for end in 0..b.len() {
+            assert!(fields(&b[..end], &["n"]).is_err(), "cut at {end}");
+        }
+    }
+
+    #[test]
     fn refuses_lengths_past_the_end() {
         // A long array that claims a billion entries.
         let b = [10, 0, 0, 12, 0, 1, b'c', 0x3b, 0x9a, 0xca, 0x00, 0];
@@ -279,6 +432,7 @@ mod tests {
                 *first = 10;
             }
             let _ = parse(&b);
+            let _ = fields(&b, &["a"]);
         }
     }
 }
