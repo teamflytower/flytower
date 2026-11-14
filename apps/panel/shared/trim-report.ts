@@ -41,6 +41,24 @@ export interface TrimPreview extends TrimReport {
   running: boolean
 }
 
+/**
+ * Which chunks a trim would remove, for the map: per dimension, per region `[x, z, mask]`,
+ * where the mask is base64 of 128 bytes and chunk `x + z * 32` within the region is bit
+ * `i % 8` of byte `i / 8`. Regions with nothing going are left out.
+ */
+export interface TrimBitmap {
+  dimensions: { id: string; regions: [number, number, string][] }[]
+}
+
+/** The last preview as the map overlay keeps it: when, with which rules, and what goes. */
+export interface TrimOverlayPreview {
+  at: string
+  /** The rules as the tool read them, to tell whether the saved rules have moved on. */
+  rules: object
+  removed: number
+  bitmap: TrimBitmap
+}
+
 const DIMENSION_NAMES: Record<string, string> = {
   'minecraft:overworld': 'Overworld',
   'minecraft:the_nether': 'Nether',

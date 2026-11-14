@@ -10,6 +10,8 @@ import { parseProperties, setProperties, stringifyProperties, toRecord } from '.
 import { parseProgress, startCommands } from '../server/world/chunky'
 import { WorldService } from '../server/world/service'
 import type { NotifyEvent } from '../server/notify/types'
+import type { TrimOverlayPreview } from '../shared/trim-report'
+import { TrimPreviews } from '../server/world/trim'
 
 describe('chunky', () => {
   it('reads progress lines', () => {
@@ -128,6 +130,7 @@ async function setup(
   }
   const snapshots: string[] = []
   const notified: NotifyEvent[] = []
+  const overlays = new Map<string, TrimOverlayPreview>()
   const keptBackups: boolean[] = []
   const pastWorlds: { name: string; files: string[] }[] = []
   const locked = new Set<string>()
@@ -185,6 +188,10 @@ async function setup(
     sleep: async () => {},
     worldTool: opts.tool,
     notify: (e) => notified.push(e),
+    trimPreviews: {
+      save: async (n, p) => void overlays.set(n, p),
+      clear: async (n) => void overlays.delete(n),
+    },
   })
   // A second server whose world can be copied in.
   const other = join(servers, 'creative')
@@ -218,6 +225,7 @@ async function setup(
     replies,
     propsPath,
     notified,
+    overlays,
   }
 }
 
@@ -408,6 +416,16 @@ function fakeTool(state: { runs: string[][]; rules: unknown[] }, fail?: string) 
     onProgress?.({ done: 0, total: 2 })
     onProgress?.({ done: 2, total: 2 })
     if (fail) throw new Error(fail)
+    const bitmap = args.indexOf('--bitmap')
+    if (bitmap >= 0) {
+      writeFileSync(
+        args[bitmap + 1]!,
+        JSON.stringify({
+          version: 1,
+          dimensions: [{ id: 'minecraft:overworld', regions: [[0, -1, 'AQ==']] }],
+        }),
+      )
+    }
     return toolAnswer(args.includes('--dry-run'))
   }
 }
@@ -426,6 +444,32 @@ describe('trimming unused chunks', () => {
     expect(t.rules).toEqual([rules])
     expect(calls).not.toContain('service.stop')
     expect(snapshots).toEqual([])
+  })
+
+  it("keeps the preview's chunk map for the web map, and drops it once trimmed", async () => {
+    const t = { runs: [] as string[][], rules: [] as unknown[] }
+    const { world, overlays } = await setup({ tool: fakeTool(t) })
+    await world.trimPreview('survival', rules)
+    expect(overlays.get('survival')).toMatchObject({
+      rules,
+      removed: 300,
+      bitmap: { dimensions: [{ id: 'minecraft:overworld', regions: [[0, -1, 'AQ==']] }] },
+    })
+    expect((await world.trim('survival', rules).done).state).toBe('succeeded')
+    expect(t.runs[1]).not.toContain('--bitmap')
+    await Bun.sleep(5)
+    expect(overlays.has('survival')).toBe(false)
+  })
+
+  it('stores previews one file per server', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ft-trim-previews-'))
+    const store = new TrimPreviews(join(dir, 'previews'))
+    expect(await store.get('survival')).toBeNull()
+    const p = { at: 'now', rules: {}, removed: 1, bitmap: { dimensions: [] } }
+    await store.save('survival', p)
+    expect(await store.get('survival')).toEqual(p)
+    await store.clear('survival')
+    expect(await store.get('survival')).toBeNull()
   })
 
   it("won't preview a world that hasn't been made yet", async () => {

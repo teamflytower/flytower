@@ -206,6 +206,28 @@ async function trim() {
               </table>
             </div>
 
+            <div
+              v-if="preview.dimensions.length"
+              class="flex flex-wrap items-center justify-between gap-2 text-xs text-muted"
+            >
+              <span v-if="server.map?.enabled">
+                See the chunks that would go, and draw protected areas, on the web map.
+              </span>
+              <span v-else>Turn on the web map to see the chunks that would go on a map.</span>
+              <UButton
+                v-if="server.map?.enabled"
+                :to="`/s/${server.name}/map/?trim`"
+                target="_blank"
+                external
+                label="Show on the map"
+                icon="i-lucide-map"
+                size="sm"
+                color="neutral"
+                variant="outline"
+                data-e2e="trim-show-map"
+              />
+            </div>
+
             <UAlert
               v-if="preview.pregenerated && totals.removed > 0"
               color="warning"

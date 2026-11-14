@@ -104,6 +104,7 @@ export function viewerPage(input: { title: string; version: string }): string {
 <link rel="icon" href="/branding/favicon">
 <link rel="stylesheet" href="/_map/viewer.css?v=${v}">
 <script src="/_map/viewer.js?v=${v}" defer></script>
+<script src="/_map/trim.js?v=${v}" defer></script>
 </head>
 <body>
 <div id="map" data-title="${escape(input.title)}"></div>

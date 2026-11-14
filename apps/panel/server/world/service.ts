@@ -12,7 +12,7 @@ import {
   WORLD_TRIM_STEPS,
   type JobEvent,
 } from '../../shared/utils/jobs'
-import type { TrimPreview, TrimReport } from '../../shared/trim-report'
+import { trimTotals, type TrimPreview, type TrimReport } from '../../shared/trim-report'
 import type { NotifyEvent } from '../notify/types'
 import { folderBytes } from '../backups/service'
 import { copyFolder } from '../clone'
@@ -29,7 +29,7 @@ import {
   type ChunkyTask,
   type PregenOptions,
 } from './chunky'
-import { trimSummary, runTrim, trimNeedBytes, type WorldTool } from './trim'
+import { runTrim, trimNeedBytes, trimSummary, type TrimPreviews, type WorldTool } from './trim'
 
 export class WorldError extends JobError {}
 
@@ -51,6 +51,8 @@ export interface WorldDeps {
   /** Runs `flytower-world`, for trimming. */
   worldTool?: WorldTool
   notify?: (e: NotifyEvent) => void
+  /** Where previews' chunk maps are kept for the web map's overlay. */
+  trimPreviews?: Pick<TrimPreviews, 'save' | 'clear'>
 }
 
 export interface PregenStatus {
@@ -382,8 +384,16 @@ export class WorldService {
     const release = this.claimTrim(name)
     try {
       const running = await this.isRunning(name)
-      const report = await runTrim(this.tool(), world, rules, { dryRun: true })
-      return { ...report, at: new Date().toISOString(), running }
+      const { bitmap, ...report } = await runTrim(this.tool(), world, rules, {
+        dryRun: true,
+        bitmap: !!this.deps.trimPreviews,
+      })
+      const at = new Date().toISOString()
+      if (bitmap) {
+        const removed = trimTotals(report).removed
+        await this.deps.trimPreviews!.save(name, { at, rules, removed, bitmap })
+      }
+      return { ...report, at, running }
     } finally {
       release()
     }
@@ -414,6 +424,8 @@ export class WorldService {
     const done = this.runTrim(name, rules, !!opts.keepBackup, job)
       .then((report) => {
         const message = trimSummary(report)
+        // The chunks it showed are gone now.
+        void this.deps.trimPreviews?.clear(name).catch(() => {})
         this.deps.notify?.({
           kind: 'world.trimmed',
           server: name,

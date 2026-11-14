@@ -33,10 +33,18 @@ The same rules are in the server's YAML under `world.trim`, so they travel with 
 ## Previewing and trimming
 
 1. Press :ui{anchor="trim.open" do}. Flytower looks at every chunk and shows, for each dimension, how many chunks would go and how big the world is now and after. Nothing changes, and the server keeps running.
-2. If the numbers look wrong, close the dialog, change the rules or add a protected area, save, and preview again.
+2. If the numbers look wrong, close the dialog, change the rules or add a protected area (on the card, or on the map: see below), save, and preview again.
 3. Press **Trim**. After your passkey, Flytower checks there's room on the disk, takes a backup of the whole server (tick **Keep the backup forever** to keep it past retention), stops the server, trims, and starts it again. Players are disconnected until the server is back up.
 
 The web map notices the changed region files and redraws by itself. If you've turned on **Unused chunks were trimmed** in [notifications](notifications.md), you're told how many chunks went and how much space came back.
+
+## On the map
+
+If the server's [web map](map.md) is on, **Show on the map** in the preview opens the map with the chunks that would go shaded red and protected areas outlined in yellow. It's only there for people who can change the server's world, even on a public map.
+
+- **Draw protected area**, then drag out a rectangle (with the mouse, or one finger on a phone) and name it. It snaps to whole chunks and is saved straight into the rules.
+- Select an area to rename or delete it.
+- Changing areas makes the preview out of date, and the red fades. **Preview again** looks once more, without leaving the map.
 
 ## Things to know
 
