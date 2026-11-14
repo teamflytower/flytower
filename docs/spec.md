@@ -174,6 +174,46 @@ map:
   public: true
 ```
 
+### `world`
+
+World settings. Left out, the current settings stay. For now it holds one thing, `trim`: what **Trim unused chunks** keeps. Trimming itself is started from the World tab, never by applying a spec, and applying changed rules never restarts the server. You can also change them in the World tab, under :ui{anchor="world.trim-rules"}.
+
+A chunk is removed only when every rule agrees it can go. Distances are in chunks (16 blocks), measured as squares.
+
+| Field              | Meaning                                                                                                                                                |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `inhabitedMinutes` | Keep chunks players have spent at least this many minutes in, in total. 0 to 60, defaults to `2`. Even at 0, a chunk anyone has spent time in is kept. |
+| `spawnRadius`      | Chunks kept round world spawn. 0 to 256, defaults to `16`.                                                                                             |
+| `playerRadius`     | Chunks kept round each player's last position and respawn point. 0 to 64, defaults to `4`.                                                             |
+| `buffer`           | Chunks kept round every kept chunk, so builds never end at a seam. 0 to 16, defaults to `2`.                                                           |
+| `endRadius`        | In the End, chunks kept round 0,0 (the main island). 0 to 256, defaults to `12`.                                                                       |
+| `unfinished`       | `false` to keep half-generated chunks. Defaults to `true`: they are removed wherever they are.                                                         |
+| `border`           | `false` to keep chunks wholly outside the world border. Defaults to `true`: they are removed.                                                          |
+| `dimensions`       | The dimensions to trim; others are left alone. Defaults to `[overworld, the_nether, the_end]`. Modded ones are written like `mod:sky`.                 |
+| `protect`          | Areas that are always kept, whatever the rules say. Up to 100.                                                                                         |
+
+Each protected area has a `name` (unique, up to 60 characters), two opposite corners `from` and `to` as `[x, z]` in block coordinates (press F3 in game to see them), and a `dimension` (defaults to `overworld`). Every chunk the area touches is kept.
+
+```yaml
+world:
+  trim:
+    inhabitedMinutes: 2
+    spawnRadius: 16
+    playerRadius: 4
+    buffer: 2
+    dimensions: [overworld, the_nether, the_end]
+    protect:
+      - name: Town
+        from: [-400, -300]
+        to: [350, 420]
+      - name: Nether hub
+        dimension: the_nether
+        from: [-40, -40]
+        to: [40, 40]
+```
+
+Changing the rules needs the **Manage the world** permission. The plan shows them under **Trim rules**.
+
 ### `timezone`
 
 The time zone the server's [scheduled tasks](schedules.md) run in, such as `Europe/London`. Left out, it stays (UTC to begin with). Backups have their own, under `backups`.
