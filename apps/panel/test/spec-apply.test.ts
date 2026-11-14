@@ -415,7 +415,11 @@ describe('plan', () => {
 
   it('saves trim rules without a restart, and shows them in the spec', async () => {
     const { service, spec, db, calls } = setup()
-    const town = { name: 'Town', from: [-400, -300], to: [350, 420] } as const
+    const town: { name: string; from: [number, number]; to: [number, number] } = {
+      name: 'Town',
+      from: [-400, -300],
+      to: [350, 420],
+    }
     const plan = await service.plan(
       'survival',
       spec({ world: { trim: { buffer: 4, protect: [town] } } }),
