@@ -3,6 +3,7 @@ const site = useAppConfig().site
 const route = useRoute()
 const items = computed(() => [
   { label: 'Docs', to: '/docs', active: route.path.startsWith('/docs') },
+  { label: 'FAQ', to: '/faq' },
   { label: 'Changelog', to: '/changelog' },
   { label: 'Why Flytower?', to: '/why-flytower' },
   { label: 'Sponsor', to: '/sponsor' },
