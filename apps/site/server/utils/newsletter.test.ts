@@ -1,12 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import {
-  CONSENT,
-  CONSENT_VERSION,
-  hashToken,
-  newToken,
-  normaliseEmail,
-  sameOrigin,
-} from './newsletter'
+import { CONSENT, CONSENT_VERSION, normaliseEmail, sameOrigin } from './newsletter'
 
 describe('normaliseEmail', () => {
   test('trims and lower-cases', () => {
@@ -29,18 +22,6 @@ describe('normaliseEmail', () => {
     expect(normaliseEmail('alex@example.com\n')).toBe('alex@example.com')
     expect(normaliseEmail('al\u0000ex@example.com')).toBeNull()
     expect(normaliseEmail(`${'a'.repeat(250)}@example.com`)).toBeNull()
-  })
-})
-
-describe('tokens', () => {
-  test('are 64 hex characters and stored only as their SHA-256', async () => {
-    const { token, hash } = await newToken()
-    expect(token).toMatch(/^[0-9a-f]{64}$/)
-    expect(hash).toBe(await hashToken(token))
-    expect(hash).not.toBe(token)
-  })
-  test('differ every time', async () => {
-    expect((await newToken()).token).not.toBe((await newToken()).token)
   })
 })
 

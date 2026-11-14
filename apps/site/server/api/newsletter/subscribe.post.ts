@@ -1,15 +1,18 @@
-import { db, schema } from 'hub:db'
-import { CONSENT_VERSION, newToken, normaliseEmail, sameOrigin } from '../../utils/newsletter'
+import { CONSENT_VERSION, normaliseEmail, sameOrigin } from '../../utils/newsletter'
 
-// Mailing list sign-up. Stores the address as `pending` with a record of consent and sends
-// nothing: confirmation emails come later, once sending is set up. Every accepted request gets
-// the same reply, so the form can't be used to find out who is already on the list.
+// Mailing list sign-up. The site checks the request (rate, origin, size, honeypot, Turnstile) and
+// then hands the address to the mailing list service over the LISTS service binding, which
+// stores it as unconfirmed and emails a confirmation link. Every accepted request gets the same
+// reply, so the form can't be used to find out who is already on the list.
 //
-// Never log the address, the body or the token here: Worker logs are kept by Cloudflare.
+// Never log the address or the body here: Worker logs are kept by Cloudflare.
 
 interface Env {
   NEWSLETTER_LIMITER?: { limit(options: { key: string }): Promise<{ success: boolean }> }
   TURNSTILE_SECRET?: { get(): Promise<string> }
+  LISTS?: {
+    subscribe(input: { list: string; email: string; consentVersion: string }): Promise<unknown>
+  }
 }
 
 const MAX_BODY = 2048
@@ -54,21 +57,16 @@ export default defineEventHandler(async (event) => {
   if (typeof body.turnstile !== 'string' || !(await turnstileOk(secret, body.turnstile, ip)))
     throw refuse(400, 'bot_check')
 
-  const { hash } = await newToken()
-  await db
-    .insert(schema.subscribers)
-    .values({
-      id: crypto.randomUUID(),
-      list: 'newsletter',
-      email,
-      status: 'pending',
-      consentVersion: CONSENT_VERSION,
-      source: 'site-footer',
-      createdAt: new Date().toISOString(),
-      tokenHash: hash,
-    })
-    .onConflictDoNothing({ target: [schema.subscribers.list, schema.subscribers.email] })
-
+  // `nuxt dev` has no binding: accept the form so the page can be worked on, and store nothing.
+  if (!env.LISTS) {
+    if (import.meta.dev) return { ok: true }
+    throw refuse(503, 'unavailable')
+  }
+  try {
+    await env.LISTS.subscribe({ list: 'newsletter', email, consentVersion: CONSENT_VERSION })
+  } catch {
+    throw refuse(503, 'unavailable')
+  }
   return { ok: true }
 })
 

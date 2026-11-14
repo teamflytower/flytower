@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// The mailing list sign-up in the footer. It stores the address as unconfirmed and sends nothing
-// yet (see server/api/newsletter). Closed (shown but disabled) unless `newsletterOpen` is set.
+// The mailing list sign-up in the footer. The address is stored as unconfirmed and a confirmation
+// email goes out (see server/api/newsletter). Closed (shown but disabled) unless `newsletterOpen` is set.
 import { CONSENT, CONSENT_VERSION } from '~~/server/utils/newsletter'
 
 declare global {

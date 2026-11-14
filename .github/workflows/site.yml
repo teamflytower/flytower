@@ -5,8 +5,8 @@ name: Website
 # get a preview URL and main (and each release, to refresh the changelog) deploys to flytower.dev.
 #
 # Secrets: CLOUDFLARE_ACCOUNT_ID, and CLOUDFLARE_API_TOKEN with Account > Workers Scripts > Edit
-# (Admin the first time, to create the Worker), Account > D1 > Edit and Account > Secrets Store >
-# Read (the mailing list), and Zone > Workers Routes > Edit on flytower.dev.
+# (Admin the first time, to create the Worker), Account > Secrets Store > Read (the mailing list's
+# Turnstile secret), and Zone > Workers Routes > Edit on flytower.dev.
 
 on:
   push:
@@ -54,17 +54,14 @@ jobs:
           path: apps/site/.output
           retention-days: 14
 
-      # Previews and the live site share the mailing list database, so its migrations go first.
-      - name: Apply database migrations
-        if: env.CLOUDFLARE_API_TOKEN != '' && (github.event.pull_request.head.repo.full_name == github.repository || (github.event_name != 'pull_request' && github.ref == 'refs/heads/main') || github.event_name == 'release')
-        working-directory: apps/site
-        run: bunx wrangler d1 migrations apply DB --remote
-
       - name: Preview deploy
         id: preview
         if: github.event_name == 'pull_request' && env.CLOUDFLARE_API_TOKEN != '' && github.event.pull_request.head.repo.full_name == github.repository
         working-directory: apps/site
         run: |
+          # Previews hand mailing list sign-ups to the staging service, never the live list.
+          sed -i 's/"service": "platform-api"/"service": "platform-api-staging"/' wrangler.jsonc
+          grep -q '"service": "platform-api-staging"' wrangler.jsonc
           out=$(bunx wrangler versions upload --preview-alias "pr-${{ github.event.number }}" --message "PR #${{ github.event.number }} @ ${GITHUB_SHA::7}" 2>&1)
           echo "$out"
           url=$(echo "$out" | grep -oE 'https://pr-[^ ]+\.workers\.dev' | head -1)

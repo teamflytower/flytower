@@ -25,20 +25,6 @@ export function normaliseEmail(input: unknown): string | null {
   return EMAIL.test(email) ? email : null
 }
 
-function hex(bytes: ArrayBuffer | Uint8Array): string {
-  return [...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, '0')).join('')
-}
-
-/** A fresh 32-byte token for confirm and unsubscribe links, and the hash we store for it. */
-export async function newToken(): Promise<{ token: string; hash: string }> {
-  const token = hex(crypto.getRandomValues(new Uint8Array(32)))
-  return { token, hash: await hashToken(token) }
-}
-
-export async function hashToken(token: string): Promise<string> {
-  return hex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token)))
-}
-
 /** The request came from one of our own pages (blocks other sites posting the form). */
 export function sameOrigin(origin: string | undefined, requestUrl: URL): boolean {
   if (!origin) return false

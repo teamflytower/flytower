@@ -14,17 +14,9 @@
   },
   // Deploying creates the DNS record and certificate for the domain on first run.
   "routes": [{ "pattern": "flytower.dev", "custom_domain": true }],
-  // The mailing list (NuxtHub's `hub:db`). EU jurisdiction, so the data stays in the EU. Migrations
-  // are generated with `bunx --bun nuxt db generate` and applied by the Website workflow.
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "flytower-newsletter",
-      "database_id": "b31e3f7c-7279-4bba-bc28-58f2234f2c17",
-      "migrations_dir": "server/db/migrations/sqlite",
-      "migrations_table": "_hub_migrations",
-    },
-  ],
+  // The mailing list service. The site checks each sign-up, then hands the address over this
+  // binding. Pull request previews bind the staging service instead (see site.yml).
+  "services": [{ "binding": "LISTS", "service": "platform-api", "entrypoint": "Lists" }],
   // At most 5 sign-up attempts per IP address a minute. The address is a counter key only.
   "ratelimits": [
     {
