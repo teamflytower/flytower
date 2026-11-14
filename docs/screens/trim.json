@@ -1,0 +1,21 @@
+{
+  "width": 1014,
+  "height": 798,
+  "device": "desktop",
+  "labels": [
+    {
+      "anchor": "trim.open",
+      "x": 81.11,
+      "y": 4.64,
+      "w": 15.24,
+      "h": 4.01
+    },
+    {
+      "anchor": "world.trim-rules",
+      "x": 3.65,
+      "y": 18.17,
+      "w": 92.7,
+      "h": 77.19
+    }
+  ]
+}
