@@ -14,6 +14,8 @@ On a box that already runs Flytower, switch it to the Beta channel under **Syste
 
 ## 1. Updating from 1.4.3
 
+The agent needs the `dbus` package. Check with `dpkg -s dbus`, and if it's missing run `sudo apt install dbus` before or after updating.
+
 - [ ] The update finishes and the panel comes back without a manual restart.
 - [ ] **System** shows 1.5.0-beta.1, and `journalctl -u flytower-agent -n 20` ends with `flytower-agent 1.5.0-beta.1 (rust) listening`.
 - [ ] A box that had `bun` in `/etc/flytower/agent` still updates and runs the Rust agent.
