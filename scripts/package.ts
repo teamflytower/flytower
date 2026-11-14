@@ -88,10 +88,13 @@ for (const bin of [
 }
 
 // Go helpers (go/), cross-compiled with cgo off, so they're static for either architecture.
+// Nothing release-specific goes in (no version, no git commit): the same source must give the
+// same binary, because the agent restarts the router, dropping every player, only when its
+// binary changes. The router reads its version from VERSION instead.
 const goModule = join(repo, 'go')
 for (const bin of ['flytower-router']) {
   const target = join(stage, 'bin', bin)
-  await $`go build -trimpath -ldflags=${`-s -w -X main.version=${version}`} -o ${target} ./cmd/${bin}`
+  await $`go build -trimpath -buildvcs=false -ldflags=${'-s -w'} -o ${target} ./cmd/${bin}`
     .cwd(goModule)
     .env({ ...process.env, CGO_ENABLED: '0', GOOS: 'linux', GOARCH: arch })
   await chmod(target, 0o755)
@@ -106,12 +109,18 @@ await cp(
 // The flytower-proxy Fabric mod, which the panel puts in Fabric servers behind the hostname
 // router so they see players' real addresses (#76). A jar runs anywhere, so one build serves
 // both architectures; the second run finds it up to date. It's signed with the rest, through
-// SHA256SUMS.
+// SHA256SUMS. It has its own version (mod_version in its gradle.properties), not the
+// release's: the panel replaces a server's copy whenever the bytes differ, and a server only
+// reads real addresses again after a restart, so the jar must only change when the mod does.
 const modDir = join(repo, 'mods/flytower-proxy')
-await $`./gradlew jar --no-daemon --console=plain -q -Pmod_version=${version}`.cwd(modDir)
+const modVersion = /^mod_version=(\S+)$/m.exec(
+  await Bun.file(join(modDir, 'gradle.properties')).text(),
+)?.[1]
+if (!modVersion) throw new Error('mods/flytower-proxy/gradle.properties has no mod_version')
+await $`./gradlew jar --no-daemon --console=plain -q`.cwd(modDir)
 await mkdir(join(stage, 'mods'), { recursive: true })
 await cp(
-  join(modDir, `build/libs/flytower-proxy-${version}.jar`),
+  join(modDir, `build/libs/flytower-proxy-${modVersion}.jar`),
   join(stage, 'mods/flytower-proxy.jar'),
 )
 
