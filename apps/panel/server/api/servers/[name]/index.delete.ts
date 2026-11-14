@@ -50,6 +50,7 @@ export default defineEventHandler(async (event) => {
   useSchedules().remove(name)
   await useExports().removeAll(name)
   await useMap().forget(name)
+  await useTrimPreviews().clear(name)
   db.insert(schema.audit)
     .values({ userId: user.id, action: 'server.delete', target: name, detail: { archivedTo } })
     .run()

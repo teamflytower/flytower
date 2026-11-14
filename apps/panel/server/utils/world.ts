@@ -4,9 +4,16 @@ import { z } from 'zod'
 import { JobError } from '../jobs/runner'
 import { runRenderer } from '../map/service'
 import { WorldService } from '../world/service'
-import type { ToolProgress } from '../world/trim'
+import { TrimPreviews, type ToolProgress } from '../world/trim'
 
 let service: WorldService | undefined
+let previews: TrimPreviews | undefined
+
+/** The last trim preview of each server, for the web map's overlay. Never served as a file. */
+export function useTrimPreviews(): TrimPreviews {
+  previews ??= new TrimPreviews(join(useRuntimeConfig().mapsDir, 'trim-previews'))
+  return previews
+}
 
 /** Where the world tool is: next to Bun in the release's bin/, or wherever FLYTOWER_WORLD says. */
 export const worldBinary = () =>
@@ -40,6 +47,7 @@ export function useWorld(): WorldService {
     stopped: (name) => useConsole().forget(name),
     worldTool: runWorldTool,
     notify: (e) => useNotify().notify(e),
+    trimPreviews: useTrimPreviews(),
   })
   return service
 }

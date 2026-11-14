@@ -168,6 +168,7 @@ export const ROUTE_PERMISSIONS: Record<string, string> = {
   'servers/[name]/world/reset.post.ts': 'world.manage',
   'servers/[name]/world/trim.post.ts': 'world.manage',
   'servers/[name]/world/trim-preview.post.ts': 'world.manage',
+  'servers/[name]/world/trim-overlay.get.ts': 'world.manage',
 
   'servers/[name]/files/list.get.ts': 'files.read',
   'servers/[name]/files/read.get.ts': 'files.read',
