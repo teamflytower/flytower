@@ -293,12 +293,12 @@ pub fn permissions(name: &str, ctx: &Context) -> Result<Value, AgentError> {
         &["-R", "--no-dereference", &ctx.panel_group, dir],
     )?;
     run(ctx, "chmod", &["-R", "g+rwX,o-rwx", dir])?;
-    // find doesn't follow links (-P is its default).
-    run(
-        ctx,
-        "find",
-        &[dir, "-type", "d", "-exec", "chmod", "g+s", "{}", "+"],
-    )?;
+    crate::safe_fs::setgid_dirs(&f.dir).map_err(|e| {
+        AgentError::new(
+            ErrorCode::Failed,
+            format!("can't set setgid on the folders in {dir}: {e}"),
+        )
+    })?;
     Ok(json!({}))
 }
 
@@ -542,9 +542,12 @@ mod tests {
             [
                 format!("chgrp -R --no-dereference flytower {}", dir.display()),
                 format!("chmod -R g+rwX,o-rwx {}", dir.display()),
-                format!("find {} -type d -exec chmod g+s {{}} +", dir.display()),
             ]
         );
+        let mode = std::os::unix::fs::PermissionsExt::mode(
+            &std::fs::metadata(&dir).unwrap().permissions(),
+        );
+        assert_eq!(mode & 0o2000, 0o2000, "the folder is setgid");
         assert_eq!(
             permissions("nope", &s.ctx()).unwrap_err().code,
             ErrorCode::NotFound

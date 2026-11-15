@@ -158,12 +158,87 @@ pub fn chmod_no_follow(path: &Path, mode: u32) -> io::Result<()> {
     file.set_permissions(fs::Permissions::from_mode(mode))
 }
 
+fn dir_flags() -> OFlags {
+    OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC
+}
+
+/// How deep [`setgid_dirs`] goes; no Minecraft server nests folders anywhere near this.
+const SETGID_DEPTH: usize = 64;
+
+/// Sets setgid on `root` and every folder under it, so files made in them later take the
+/// folder's group. It works through handles, each folder opened relative to its parent
+/// without following a link, so a folder swapped for a link part-way through can't send the
+/// change anywhere else.
+///
+/// # Errors
+/// If `root` isn't a folder, or one can't be read or changed.
+pub fn setgid_dirs(root: &Path) -> io::Result<()> {
+    let fd = rustix::fs::open(root, dir_flags(), rustix::fs::Mode::empty())?;
+    setgid_tree(&fd, 0)
+}
+
+fn setgid_tree(fd: &std::os::fd::OwnedFd, depth: usize) -> io::Result<()> {
+    use rustix::fs::{FileType, Mode};
+    use rustix::io::Errno;
+
+    let mode = rustix::fs::fstat(fd)?.st_mode & 0o7777;
+    if mode & 0o2000 == 0 {
+        rustix::fs::fchmod(fd, Mode::from_raw_mode(mode | 0o2000))?;
+    }
+    if depth >= SETGID_DEPTH {
+        return Ok(());
+    }
+    let mut dir = rustix::fs::Dir::read_from(fd)?;
+    while let Some(entry) = dir.read() {
+        let entry = entry?;
+        let name = entry.file_name();
+        if name == c"." || name == c".." {
+            continue;
+        }
+        if !matches!(entry.file_type(), FileType::Directory | FileType::Unknown) {
+            continue;
+        }
+        match rustix::fs::openat(fd, name, dir_flags(), Mode::empty()) {
+            Ok(child) => setgid_tree(&child, depth + 1)?,
+            // Gone, a link, or not a folder after all: nothing to set.
+            Err(e) if e == Errno::NOENT || e == Errno::LOOP || e == Errno::NOTDIR => {}
+            Err(e) => return Err(e.into()),
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use std::os::unix::fs::symlink;
 
     use super::*;
     use crate::handlers::testing::TempRoot;
+
+    #[test]
+    fn sets_setgid_on_folders_without_following_links() {
+        let root = TempRoot::new("safe-fs-setgid");
+        let base = Path::new(&root.paths.state);
+        let (tree, outside) = (base.join("tree"), base.join("outside"));
+        fs::create_dir_all(tree.join("a/b")).unwrap();
+        fs::create_dir_all(&outside).unwrap();
+        fs::write(tree.join("a/file"), "x").unwrap();
+        symlink(&outside, tree.join("a/link")).unwrap();
+        for d in [&tree, &outside] {
+            fs::set_permissions(d, fs::Permissions::from_mode(0o750)).unwrap();
+        }
+        setgid_dirs(&tree).unwrap();
+        let mode = |p: &Path| fs::symlink_metadata(p).unwrap().mode() & 0o7777;
+        assert_eq!(mode(&tree), 0o2750);
+        assert_eq!(mode(&tree.join("a")) & 0o2000, 0o2000);
+        assert_eq!(mode(&tree.join("a/b")) & 0o2000, 0o2000);
+        assert_eq!(mode(&tree.join("a/file")) & 0o2000, 0);
+        assert_eq!(mode(&outside), 0o750, "the link's target is left alone");
+        assert!(
+            setgid_dirs(&tree.join("a/link")).is_err(),
+            "a link isn't a folder to start from"
+        );
+    }
 
     #[test]
     fn copies_without_following_links_at_either_end() {

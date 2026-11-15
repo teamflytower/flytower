@@ -126,21 +126,44 @@ pub fn not_following(servers: &[String]) -> Value {
 pub fn action(verb: &str, server: &str, ctx: &Context) -> Result<Value, AgentError> {
     assert_known(ctx, server)?;
     let unit = unit_name(server);
+    if verb == "stop" {
+        ctx.systemd.job(verb, &unit).map_err(failed)?;
+        return Ok(json!({}));
+    }
     // A server left stopped after a crash loop has hit its start limit, and systemd refuses
     // to start it until that is cleared. Starting it from the panel is the person saying so.
     // A unit with nothing to clear answers with an error, which doesn't matter here.
-    if verb != "stop" {
-        let _ = ctx.systemd.reset_failed(&unit);
-        // Put right any files the panel couldn't read, such as region files written into a
-        // folder that came from elsewhere, before the server starts. Starting matters more.
-        if let Err(e) = crate::handlers::server::permissions(server, ctx) {
-            eprintln!(
-                "flytower-agent: couldn't restore permissions for {server}: {}",
-                e.message
-            );
+    let _ = ctx.systemd.reset_failed(&unit);
+    // Put right any files the panel can't read, such as region files written into a folder
+    // that came from elsewhere. Only while the server is stopped, so it isn't writing to the
+    // folder at the same time: a restart becomes a stop, the repair, then a start.
+    let running = ctx
+        .systemd
+        .show(&unit, &["ActiveState"])
+        .map_err(failed)?
+        .get("ActiveState")
+        .is_some_and(|s| {
+            matches!(
+                s.as_str(),
+                "active" | "activating" | "reloading" | "deactivating" | "refreshing"
+            )
+        });
+    if running {
+        if verb == "start" {
+            // Already up (or on its way): start it as asked, and repair at a later start.
+            ctx.systemd.job("start", &unit).map_err(failed)?;
+            return Ok(json!({}));
         }
+        ctx.systemd.job("stop", &unit).map_err(failed)?;
     }
-    ctx.systemd.job(verb, &unit).map_err(failed)?;
+    if let Err(e) = crate::handlers::server::permissions(server, ctx) {
+        // Starting matters more than the repair.
+        eprintln!(
+            "flytower-agent: couldn't restore permissions for {server}: {}",
+            e.message
+        );
+    }
+    ctx.systemd.job("start", &unit).map_err(failed)?;
     Ok(json!({}))
 }
 
@@ -148,6 +171,7 @@ pub fn action(verb: &str, server: &str, ctx: &Context) -> Result<Value, AgentErr
 mod tests {
     use super::*;
     use crate::handlers::testing::{FakeSystemd, TempRoot};
+    use std::path::PathBuf;
     use std::sync::Arc;
 
     fn ctx(systemd: &Arc<FakeSystemd>) -> (Context, TempRoot) {
@@ -229,7 +253,11 @@ mod tests {
         action("start", "survival", &c).unwrap();
         assert_eq!(
             sd.ran()[1..],
-            [format!("reset-failed {UNIT}"), format!("start {UNIT}")]
+            [
+                format!("reset-failed {UNIT}"),
+                format!("show {UNIT} ActiveState"),
+                format!("start {UNIT}")
+            ]
         );
         let sd = FakeSystemd::with(&[(UNIT, &[])]);
         let (c, _root) = ctx(&sd);
@@ -237,30 +265,72 @@ mod tests {
         assert_eq!(sd.ran()[1..], [format!("stop {UNIT}")]);
     }
 
-    #[test]
-    fn restores_permissions_before_starting() {
-        let sd = FakeSystemd::with(&[(UNIT, &[])]);
+    fn with_folder(
+        sd: &Arc<FakeSystemd>,
+    ) -> (Context, crate::handlers::testing::Fake, PathBuf, TempRoot) {
         let root = TempRoot::new("service-perms");
         let fake = crate::handlers::testing::Fake::default();
         let mut c = fake.context(&root.paths);
-        c.systemd = Arc::clone(&sd) as Arc<dyn crate::systemd::Systemd>;
+        c.systemd = Arc::clone(sd) as Arc<dyn crate::systemd::Systemd>;
         let dir = std::path::Path::new(&root.paths.servers).join("survival");
         std::fs::create_dir_all(&dir).unwrap();
+        (c, fake, dir, root)
+    }
+
+    fn is_setgid(dir: &std::path::Path) -> bool {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::metadata(dir).unwrap().permissions().mode() & 0o2000 != 0
+    }
+
+    #[test]
+    fn restores_permissions_before_starting() {
+        let sd = FakeSystemd::with(&[(UNIT, &[("ActiveState", "inactive")])]);
+        let (c, fake, dir, _root) = with_folder(&sd);
         action("start", "survival", &c).unwrap();
-        let ran = fake.ran();
-        assert!(ran.contains(&format!(
+        assert!(fake.ran().contains(&format!(
             "chgrp -R --no-dereference flytower {}",
             dir.display()
         )));
-        assert!(ran.contains(&format!(
-            "find {} -type d -exec chmod g+s {{}} +",
-            dir.display()
-        )));
+        assert!(is_setgid(&dir));
         assert_eq!(sd.ran().last().unwrap(), &format!("start {UNIT}"));
         // Stopping leaves the files alone.
         fake.clear();
         action("stop", "survival", &c).unwrap();
         assert!(fake.ran().is_empty());
+    }
+
+    #[test]
+    fn repairs_only_while_stopped() {
+        // A restart of a running server stops it, repairs, then starts it.
+        let sd = FakeSystemd::with(&[(UNIT, &[("ActiveState", "active")])]);
+        let (c, fake, _dir, _root) = with_folder(&sd);
+        action("restart", "survival", &c).unwrap();
+        assert_eq!(
+            sd.ran()[1..],
+            [
+                format!("reset-failed {UNIT}"),
+                format!("show {UNIT} ActiveState"),
+                format!("stop {UNIT}"),
+                format!("start {UNIT}")
+            ]
+        );
+        assert!(
+            !fake.ran().is_empty(),
+            "repaired between the stop and the start"
+        );
+        // Starting one that's already running repairs nothing.
+        let sd = FakeSystemd::with(&[(UNIT, &[("ActiveState", "active")])]);
+        let (c, fake, _dir, _root) = with_folder(&sd);
+        action("start", "survival", &c).unwrap();
+        assert!(fake.ran().is_empty());
+        assert_eq!(sd.ran().last().unwrap(), &format!("start {UNIT}"));
+        // A stop that fails leaves the files alone and doesn't start it again.
+        let sd = FakeSystemd::with(&[(UNIT, &[("ActiveState", "active")])]);
+        sd.fail("stop", "Access denied");
+        let (c, fake, _dir, _root) = with_folder(&sd);
+        assert!(action("restart", "survival", &c).is_err());
+        assert!(fake.ran().is_empty());
+        assert!(!sd.ran().contains(&format!("start {UNIT}")));
     }
 
     #[test]
