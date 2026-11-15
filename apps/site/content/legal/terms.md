@@ -1,7 +1,7 @@
 ---
 title: Terms of Use
 description: The terms for using the Flytower website and documentation, and how they relate to the open source licence for the software.
-lastUpdated: '2026-11-10'
+lastUpdated: '2026-11-15'
 ---
 
 These terms apply when you use the Flytower website at `https://flytower.example`, including its
@@ -14,7 +14,8 @@ Flytower is an open source project run by one person, Matt Adcock, who is based 
 terms, "we", "us" and "Flytower" mean Matt. Flytower is not a company.
 
 - Email: [hello@flytower.example](mailto:hello@flytower.example)
-- Post: **[TODO: contact address, see the note in the pull request]**
+- Post: Flytower is run from a private home, so the postal address is not published here. Email
+  [hello@flytower.example](mailto:hello@flytower.example) and we will give it to you.
 
 Flytower is not registered for VAT.
 

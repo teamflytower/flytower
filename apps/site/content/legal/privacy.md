@@ -1,7 +1,7 @@
 ---
 title: Privacy Policy
 description: What personal data the Flytower website collects, why, who it is shared with, and the rights you have over it.
-lastUpdated: '2026-11-13'
+lastUpdated: '2026-11-15'
 ---
 
 This policy explains what personal data is collected when you use the Flytower website at
@@ -22,7 +22,8 @@ policy, "we", "us" and "Flytower" mean Matt. He is the data controller for the p
 here, under the UK General Data Protection Regulation (UK GDPR) and the Data Protection Act 2018.
 
 - Email: [privacy@flytower.example](mailto:privacy@flytower.example)
-- Post: **[TODO: contact address, see the note in the pull request]**
+- Post: Flytower is run from a private home, so the postal address is not published here. Email
+  [privacy@flytower.example](mailto:privacy@flytower.example) and we will give it to you.
 - ICO registration: **[TODO: registration number, or remove this line if the ICO self-assessment says no fee is due]**
 
 Flytower is not a company and has no Data Protection Officer. Matt answers privacy questions himself.
