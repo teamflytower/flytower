@@ -129,7 +129,13 @@ async function save() {
   try {
     const { rules } = await $fetch<{ rules: Rules }>(
       `/api/servers/${name.value}/world/trim-rules` as string,
-      { method: 'PATCH', body: toRules.value },
+      {
+        method: 'PATCH',
+        // Sent as a string: $fetch takes any object with a `buffer` field for binary data and
+        // sends "[object Object]", and the rules have one.
+        body: JSON.stringify(toRules.value),
+        headers: { 'content-type': 'application/json' },
+      },
     )
     await refreshServer()
     draft.value = clone(rules)
