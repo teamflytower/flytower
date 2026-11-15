@@ -9,7 +9,7 @@ import { can, NO_ACCESS, type Access, type Permission } from '../../shared/permi
 const Topic = z
   .string()
   .regex(
-    /^(job:\d+|servers|health|metrics|updates|branding|(console|schedules|map):[a-z][a-z0-9-]{1,30})$/,
+    /^(job:\d+|servers|health|metrics|updates|branding|(console|schedules|map|trim):[a-z][a-z0-9-]{1,30})$/,
   )
 const ClientMessage = z.discriminatedUnion('type', [
   z.object({ type: z.literal('subscribe'), topic: Topic }),
@@ -40,6 +40,9 @@ function topicNeeds(topic: string): { permission: Permission; server: string } |
   }
   if (topic.startsWith('map:')) {
     return { permission: 'server.view', server: topic.slice('map:'.length) }
+  }
+  if (topic.startsWith('trim:')) {
+    return { permission: 'world.manage', server: topic.slice('trim:'.length) }
   }
   return null
 }
@@ -104,6 +107,11 @@ function attach(topic: string, emit: (data: unknown) => void, access: () => Acce
       .catch(() => {})
     return off
   }
+  if (topic.startsWith('trim:')) {
+    const off = useJobs().bus.subscribe(topic, emit)
+    emit(useWorld().trimPreviewState(topic.slice('trim:'.length)))
+    return off
+  }
   const off = useJobs().bus.subscribe(topic, emit)
   emit(useJobs().get(Number(topic.slice('job:'.length))))
   return off
@@ -111,7 +119,7 @@ function attach(topic: string, emit: (data: unknown) => void, access: () => Acce
 
 /**
  * One authenticated socket per tab. The browser subscribes to topics (`job:<id>`,
- * `servers`, `health`, `metrics`, `updates`, `branding`, `console:<name>`, `schedules:<name>`, `map:<name>`) and gets `{ topic, data }`
+ * `servers`, `health`, `metrics`, `updates`, `branding`, `console:<name>`, `schedules:<name>`, `map:<name>`, `trim:<name>`) and gets `{ topic, data }`
  * messages back.
  */
 export default defineWebSocketHandler({

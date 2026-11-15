@@ -10,7 +10,7 @@ import { parseProperties, setProperties, stringifyProperties, toRecord } from '.
 import { parseProgress, startCommands } from '../server/world/chunky'
 import { WorldService } from '../server/world/service'
 import type { NotifyEvent } from '../server/notify/types'
-import type { TrimOverlayPreview } from '../shared/trim-report'
+import type { TrimOverlayPreview, TrimPreviewState } from '../shared/trim-report'
 import { TrimPreviews } from '../server/world/trim'
 
 describe('chunky', () => {
@@ -131,6 +131,7 @@ async function setup(
   const snapshots: string[] = []
   const notified: NotifyEvent[] = []
   const overlays = new Map<string, TrimOverlayPreview>()
+  const published: { topic: string; message: TrimPreviewState }[] = []
   const keptBackups: boolean[] = []
   const pastWorlds: { name: string; files: string[] }[] = []
   const locked = new Set<string>()
@@ -192,6 +193,7 @@ async function setup(
       save: async (n, p) => void overlays.set(n, p),
       clear: async (n) => void overlays.delete(n),
     },
+    publish: (topic, message) => published.push({ topic, message: message as TrimPreviewState }),
   })
   // A second server whose world can be copied in.
   const other = join(servers, 'creative')
@@ -226,6 +228,7 @@ async function setup(
     propsPath,
     notified,
     overlays,
+    published,
   }
 }
 
@@ -550,6 +553,52 @@ describe('trimming unused chunks', () => {
     expect(job.message).toContain('r.0.0.mca: disk full')
     expect(job.message).toContain('the backup taken first')
     expect(calls.at(-1)).toBe('service.start')
+  })
+
+  it('runs a preview in the background, saying how far it has got', async () => {
+    let finish!: () => void
+    const held = new Promise<void>((r) => (finish = r))
+    const { world, published } = await setup({
+      tool: async (args, onProgress) => {
+        onProgress?.({ done: 1, total: 4 })
+        await held
+        onProgress?.({ done: 4, total: 4 })
+        return toolAnswer(args.includes('--dry-run'))
+      },
+    })
+    const started = await world.startTrimPreview('survival', rules)
+    expect(started).toMatchObject({ state: 'running', rules })
+    // Asking again with the same rules joins it rather than refusing.
+    expect(await world.startTrimPreview('survival', rules)).toMatchObject({
+      state: 'running',
+      run: (started as { run: number }).run,
+    })
+    await expect(world.startTrimPreview('survival', { ...rules, buffer: 9 })).rejects.toThrow(
+      'already being looked at',
+    )
+    finish()
+    const preview = await world.trimPreview('survival', rules)
+    expect(preview.dryRun).toBe(true)
+    const states = published.filter((p) => p.topic === 'trim:survival').map((p) => p.message)
+    expect(states.at(-1)).toMatchObject({ state: 'done', preview: { dryRun: true } })
+    expect(states.some((s) => s.state === 'running' && s.total === 4)).toBe(true)
+    expect(world.trimPreviewState('survival')).toMatchObject({ state: 'done' })
+    // Done, so the world is free for a trim.
+    expect((await world.trim('survival', rules).done).state).toBe('succeeded')
+  })
+
+  it('says why a preview failed, and frees the world', async () => {
+    const t = { runs: [] as string[][], rules: [] as unknown[] }
+    const { world } = await setup({ tool: fakeTool(t, 'r.0.0.mca: unreadable') })
+    await expect(world.trimPreview('survival', rules)).rejects.toThrow('r.0.0.mca: unreadable')
+    expect(world.trimPreviewState('survival')).toMatchObject({
+      state: 'failed',
+      error: expect.stringContaining('r.0.0.mca: unreadable'),
+    })
+    expect(world.trimPreviewState('creative')).toEqual({ state: 'idle' })
+    await expect(world.startTrimPreview('survival', rules)).resolves.toMatchObject({
+      state: 'running',
+    })
   })
 
   it('runs one trim or preview at a time per server', async () => {
