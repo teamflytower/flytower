@@ -222,8 +222,10 @@ function onRight(e: KeyboardEvent) {
 </script>
 
 <template>
+  <!-- Always dark, like a terminal, whatever the panel's theme: `dark` gives the lines inside
+       the dark theme's text colours, so they stay readable in light mode. -->
   <section
-    class="flex min-h-0 flex-col overflow-hidden rounded-lg border border-default bg-[#0b0e14]"
+    class="dark flex min-h-0 flex-col overflow-hidden rounded-lg border border-default bg-[#0b0e14]"
   >
     <div class="relative min-h-0 flex-1">
       <div
