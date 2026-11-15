@@ -56,9 +56,13 @@ jobs:
       pull-requests: read
     env:
       PR: ${{ github.event.pull_request.number || inputs.pr }}
-      REVIEW_DIR: ${{ runner.temp }}/review
-      TOOLS: ${{ runner.temp }}/reviewer
     steps:
+      # The runner context isn't available to job-level env, so the paths are set here.
+      - name: Set the working paths
+        run: |
+          echo "REVIEW_DIR=$RUNNER_TEMP/review" >> "$GITHUB_ENV"
+          echo "TOOLS=$RUNNER_TEMP/reviewer" >> "$GITHUB_ENV"
+
       - id: app
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
