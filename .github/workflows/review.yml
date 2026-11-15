@@ -13,7 +13,7 @@ name: Review
 # rewrite its own reviewer (until they're on main, the pull request's own copies are used).
 #
 # Secrets and variables:
-#   REVIEWER_CLIENT_ID       variable: the app's client ID
+#   REVIEWER_CLIENT_ID       the app's client ID, as a variable or a secret
 #   REVIEWER_PRIVATE_KEY     the app's private key (the whole .pem file)
 #   CLAUDE_CODE_OAUTH_TOKEN  a Claude subscription token from `claude setup-token`, or
 #   ANTHROPIC_API_KEY        an Anthropic API key, as for the Assistant workflow
@@ -66,7 +66,7 @@ jobs:
       - id: app
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          client-id: ${{ vars.REVIEWER_CLIENT_ID }}
+          client-id: ${{ vars.REVIEWER_CLIENT_ID || secrets.REVIEWER_CLIENT_ID }}
           private-key: ${{ secrets.REVIEWER_PRIVATE_KEY }}
           permission-contents: read
           permission-pull-requests: write
