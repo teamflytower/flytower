@@ -6,6 +6,8 @@ Description=Flytower hostname router
 Documentation=https://github.com/teamflytower/flytower/blob/main/docs/addresses.md
 After=network-online.target
 Wants=network-online.target
+# Never give up restarting: players have no other way in while it's down.
+StartLimitIntervalSec=0
 
 [Service]
 Type=exec
