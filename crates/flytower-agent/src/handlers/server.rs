@@ -272,7 +272,9 @@ pub fn configure(
 }
 
 /// `server.permissions`: restores group access across a server folder (the owner stays the
-/// server's user). Symlinks aren't followed.
+/// server's user). Symlinks aren't followed. Every folder also gets setgid, so files the server
+/// writes later (new region files, say) belong to the panel's group too: without it, a folder
+/// copied in from elsewhere gives them the server's own group, which the panel can't read.
 ///
 /// # Errors
 /// `not_found` for an unknown server, `failed` if chgrp or chmod fail.
@@ -291,6 +293,12 @@ pub fn permissions(name: &str, ctx: &Context) -> Result<Value, AgentError> {
         &["-R", "--no-dereference", &ctx.panel_group, dir],
     )?;
     run(ctx, "chmod", &["-R", "g+rwX,o-rwx", dir])?;
+    crate::safe_fs::setgid_dirs(&f.dir).map_err(|e| {
+        AgentError::new(
+            ErrorCode::Failed,
+            format!("can't set setgid on the folders in {dir}: {e}"),
+        )
+    })?;
     Ok(json!({}))
 }
 
@@ -536,6 +544,10 @@ mod tests {
                 format!("chmod -R g+rwX,o-rwx {}", dir.display()),
             ]
         );
+        let mode = std::os::unix::fs::PermissionsExt::mode(
+            &std::fs::metadata(&dir).unwrap().permissions(),
+        );
+        assert_eq!(mode & 0o2000, 0o2000, "the folder is setgid");
         assert_eq!(
             permissions("nope", &s.ctx()).unwrap_err().code,
             ErrorCode::NotFound
