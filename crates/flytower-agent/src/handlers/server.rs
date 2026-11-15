@@ -272,7 +272,9 @@ pub fn configure(
 }
 
 /// `server.permissions`: restores group access across a server folder (the owner stays the
-/// server's user). Symlinks aren't followed.
+/// server's user). Symlinks aren't followed. Every folder also gets setgid, so files the server
+/// writes later (new region files, say) belong to the panel's group too: without it, a folder
+/// copied in from elsewhere gives them the server's own group, which the panel can't read.
 ///
 /// # Errors
 /// `not_found` for an unknown server, `failed` if chgrp or chmod fail.
@@ -291,6 +293,12 @@ pub fn permissions(name: &str, ctx: &Context) -> Result<Value, AgentError> {
         &["-R", "--no-dereference", &ctx.panel_group, dir],
     )?;
     run(ctx, "chmod", &["-R", "g+rwX,o-rwx", dir])?;
+    // find doesn't follow links (-P is its default).
+    run(
+        ctx,
+        "find",
+        &[dir, "-type", "d", "-exec", "chmod", "g+s", "{}", "+"],
+    )?;
     Ok(json!({}))
 }
 
@@ -534,6 +542,7 @@ mod tests {
             [
                 format!("chgrp -R --no-dereference flytower {}", dir.display()),
                 format!("chmod -R g+rwX,o-rwx {}", dir.display()),
+                format!("find {} -type d -exec chmod g+s {{}} +", dir.display()),
             ]
         );
         assert_eq!(

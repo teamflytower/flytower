@@ -131,6 +131,14 @@ pub fn action(verb: &str, server: &str, ctx: &Context) -> Result<Value, AgentErr
     // A unit with nothing to clear answers with an error, which doesn't matter here.
     if verb != "stop" {
         let _ = ctx.systemd.reset_failed(&unit);
+        // Put right any files the panel couldn't read, such as region files written into a
+        // folder that came from elsewhere, before the server starts. Starting matters more.
+        if let Err(e) = crate::handlers::server::permissions(server, ctx) {
+            eprintln!(
+                "flytower-agent: couldn't restore permissions for {server}: {}",
+                e.message
+            );
+        }
     }
     ctx.systemd.job(verb, &unit).map_err(failed)?;
     Ok(json!({}))
@@ -227,6 +235,32 @@ mod tests {
         let (c, _root) = ctx(&sd);
         action("stop", "survival", &c).unwrap();
         assert_eq!(sd.ran()[1..], [format!("stop {UNIT}")]);
+    }
+
+    #[test]
+    fn restores_permissions_before_starting() {
+        let sd = FakeSystemd::with(&[(UNIT, &[])]);
+        let root = TempRoot::new("service-perms");
+        let fake = crate::handlers::testing::Fake::default();
+        let mut c = fake.context(&root.paths);
+        c.systemd = Arc::clone(&sd) as Arc<dyn crate::systemd::Systemd>;
+        let dir = std::path::Path::new(&root.paths.servers).join("survival");
+        std::fs::create_dir_all(&dir).unwrap();
+        action("start", "survival", &c).unwrap();
+        let ran = fake.ran();
+        assert!(ran.contains(&format!(
+            "chgrp -R --no-dereference flytower {}",
+            dir.display()
+        )));
+        assert!(ran.contains(&format!(
+            "find {} -type d -exec chmod g+s {{}} +",
+            dir.display()
+        )));
+        assert_eq!(sd.ran().last().unwrap(), &format!("start {UNIT}"));
+        // Stopping leaves the files alone.
+        fake.clear();
+        action("stop", "survival", &c).unwrap();
+        assert!(fake.ran().is_empty());
     }
 
     #[test]
