@@ -245,8 +245,13 @@ async function prepare() {
     const ancestor = await $`git merge-base --is-ancestor ${last.commit_id} ${head}`
       .nothrow()
       .quiet()
-    if (ancestor.exitCode === 0) {
-      await $`git diff --no-color --no-ext-diff ${last.commit_id} ${head} > ${dir}/since.patch`
+    // Only the pull request's own files: if main was merged in since, its changes would
+    // otherwise show up as new and the reviewer would comment on other people's code.
+    const files = (await $`git diff --name-only ${base}...${head}`.text())
+      .split('\n')
+      .filter(Boolean)
+    if (ancestor.exitCode === 0 && files.length) {
+      await $`git diff --no-color --no-ext-diff ${last.commit_id} ${head} -- ${files} > ${dir}/since.patch`
       since = `${dir}/since.patch`
     }
   }
