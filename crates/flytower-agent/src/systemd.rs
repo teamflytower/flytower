@@ -140,7 +140,11 @@ impl Bus {
         zbus::block_on(async {
             let mut retried = false;
             loop {
-                let conn = self.connection().await.map_err(|e| message(&e))?;
+                let conn = self.connection().await.map_err(|e| {
+                    format!(
+                        "can't reach systemd over the D-Bus system bus ({e}). Is D-Bus installed and running? On Debian or Ubuntu: apt install dbus"
+                    )
+                })?;
                 match f(&conn).await {
                     Err(e) if refusal(&e).is_none() => {
                         *lock(&self.conn) = None;
